@@ -20,7 +20,9 @@ public interface StatsRepository extends JpaRepository<Hit, Long> {
      */
     interface ViewStatsProjection {
         String getApp();
+
         String getUri();
+
         Long getHits();
     }
 
