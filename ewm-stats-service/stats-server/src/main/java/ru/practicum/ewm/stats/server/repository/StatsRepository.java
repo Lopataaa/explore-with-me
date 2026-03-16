@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,7 +15,9 @@ public interface StatsRepository extends JpaRepository<Hit, Long> {
     // Интерфейс для проекции результата запроса
     interface ViewStatsProjection {
         String getApp();
+
         String getUri();
+
         Long getHits();
     }
 
