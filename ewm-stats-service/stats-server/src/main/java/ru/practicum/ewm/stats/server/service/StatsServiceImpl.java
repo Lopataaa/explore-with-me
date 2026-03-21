@@ -1,7 +1,7 @@
 package ru.practicum.ewm.stats.server.service;
 
-import ru.practicum.ewm.stats.dto.EndpointHit;
-import ru.practicum.ewm.stats.dto.ViewStats;
+import ru.dto.EndpointHit;
+import ru.dto.ViewStats;
 import ru.practicum.ewm.stats.server.mapper.HitMapper;
 import ru.practicum.ewm.stats.server.model.Hit;
 import ru.practicum.ewm.stats.server.repository.StatsRepository;
@@ -43,7 +43,6 @@ public class StatsServiceImpl implements StatsService {
         log.info("Получение статистики за период с {} по {}, uris={}, unique={}",
                 start, end, uris, unique);
 
-        // Валидация дат
         if (start.isAfter(end)) {
             throw new IllegalArgumentException("Дата начала не может быть позже даты окончания");
         }

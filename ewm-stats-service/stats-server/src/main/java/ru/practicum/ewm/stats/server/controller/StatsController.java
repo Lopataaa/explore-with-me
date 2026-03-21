@@ -1,7 +1,7 @@
 package ru.practicum.ewm.stats.server.controller;
 
-import ru.practicum.ewm.stats.dto.EndpointHit;
-import ru.practicum.ewm.stats.dto.ViewStats;
+import ru.dto.EndpointHit;
+import ru.dto.ViewStats;
 import ru.practicum.ewm.stats.server.service.StatsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -1,6 +1,6 @@
 package ru.practicum.ewm.stats.server.mapper;
 
-import ru.practicum.ewm.stats.dto.EndpointHit;
+import ru.dto.EndpointHit;
 import ru.practicum.ewm.stats.server.model.Hit;
 import org.springframework.stereotype.Component;
 
