@@ -42,9 +42,9 @@ services:
       interval: 5s
       retries: 10
 
-  main-service:
+  ewm-service:
     build: ./ewm-main-service
-    container_name: main-service
+    container_name: ewm-service
     ports:
       - "8080:8080"
     depends_on:
