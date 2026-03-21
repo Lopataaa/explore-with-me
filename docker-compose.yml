@@ -16,7 +16,7 @@ services:
       retries: 10
 
   stats-server:
-    build: ./stats-service/stats-server
+    build: ./ewm-stats-service/stats-server
     container_name: stats-server
     ports:
       - "9090:9090"
@@ -44,7 +44,7 @@ services:
       retries: 10
 
   main-service:
-    build: ./main-service
+    build: ./ewm-main-service
     container_name: main-service
     ports:
       - "8080:8080"
