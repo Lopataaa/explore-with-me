@@ -12,6 +12,7 @@ import ru.practicum.main.category.mapper.CategoryMapper;
 import ru.practicum.main.category.model.Category;
 import ru.practicum.main.category.repository.CategoryRepository;
 import ru.practicum.main.event.repository.EventRepository;
+import ru.practicum.main.exception.BadRequestException;
 import ru.practicum.main.exception.ConflictException;
 import ru.practicum.main.exception.NotFoundException;
 
@@ -100,6 +101,13 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public CategoryDto updateCategory(Long catId, CategoryDto categoryDto) {
         log.info("Updating category with id: {}, name: {}", catId, categoryDto.getName());
+
+        if (categoryDto.getName() == null || categoryDto.getName().isBlank()) {
+            throw new BadRequestException("Name must not be blank");
+        }
+        if (categoryDto.getName().length() > 50) {
+            throw new BadRequestException("Name length must be no more than 50");
+        }
 
         Category category = categoryRepository.findById(catId)
                 .orElseThrow(() -> new NotFoundException("Category with id=" + catId + " was not found"));

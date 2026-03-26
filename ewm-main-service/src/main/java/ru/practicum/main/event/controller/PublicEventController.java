@@ -12,6 +12,7 @@ import ru.practicum.main.event.service.EventService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import ru.practicum.main.exception.BadRequestException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -43,6 +44,10 @@ public class PublicEventController {
 
         log.info("GET /events - Getting events with text: {}, categories: {}, paid: {}, rangeStart: {}, rangeEnd: {}, onlyAvailable: {}, sort: {}, from: {}, size: {}",
                 text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
+
+        if (rangeStart != null && rangeEnd != null && rangeStart.isAfter(rangeEnd)) {
+            throw new BadRequestException("rangeStart must be before rangeEnd");
+        }
 
         return eventService.getPublicEvents(text, categories, paid, rangeStart, rangeEnd,
                 onlyAvailable, sort, from, size, httpRequest);

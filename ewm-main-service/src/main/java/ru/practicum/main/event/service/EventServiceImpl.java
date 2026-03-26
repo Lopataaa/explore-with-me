@@ -26,6 +26,7 @@ import ru.practicum.main.user.repository.UserRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -296,6 +297,7 @@ public class EventServiceImpl implements EventService {
         if (rangeStart == null) {
             rangeStart = LocalDateTime.now();
         }
+
         if (rangeEnd == null) {
             rangeEnd = LocalDateTime.now().plusYears(10);
         }
@@ -308,6 +310,10 @@ public class EventServiceImpl implements EventService {
         }
 
         Page<Event> events = eventRepository.findPublicEvents(text, categories, paid, rangeStart, rangeEnd, pageable);
+
+        if (events == null) {
+            return new ArrayList<>();
+        }
 
         statsClient.saveHit("ewm-main-service", httpRequest.getRequestURI(),
                 httpRequest.getRemoteAddr(), LocalDateTime.now());

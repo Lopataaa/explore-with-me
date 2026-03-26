@@ -79,7 +79,12 @@ public class RequestServiceImpl implements RequestService {
             throw new ConflictException("The participant limit has been reached");
         }
 
-        RequestStatus status = event.getRequestModeration() ? RequestStatus.PENDING : RequestStatus.CONFIRMED;
+        RequestStatus status;
+        if (event.getParticipantLimit() == 0) {
+            status = RequestStatus.CONFIRMED;
+        } else {
+            status = event.getRequestModeration() ? RequestStatus.PENDING : RequestStatus.CONFIRMED;
+        }
 
         Request request = Request.builder()
                 .event(event)
