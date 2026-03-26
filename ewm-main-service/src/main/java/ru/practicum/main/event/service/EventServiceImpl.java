@@ -310,35 +310,62 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
-        log.info("Getting public events");
+        log.info("Getting public events with params: text={}, categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}, from={}, size={}",
+                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
 
-        if (rangeStart == null) {
-            rangeStart = LocalDateTime.now();
+        try {
+            if (rangeStart == null) {
+                rangeStart = LocalDateTime.now();
+                log.debug("rangeStart set to current time: {}", rangeStart);
+            }
+
+            if (rangeEnd == null) {
+                rangeEnd = LocalDateTime.now().plusYears(10);
+                log.debug("rangeEnd set to +10 years: {}", rangeEnd);
+            }
+
+            if (rangeStart.isAfter(rangeEnd)) {
+                throw new BadRequestException("rangeStart must be before rangeEnd");
+            }
+
+            Pageable pageable;
+            if (sort != null && sort.equals("VIEWS")) {
+                pageable = PageRequest.of(from / size, size, Sort.by("views").descending());
+            } else {
+                pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
+            }
+
+            log.debug("Executing query with pageable: {}", pageable);
+
+            Page<Event> events = eventRepository.findPublicEvents(text, categories, paid, rangeStart, rangeEnd, pageable);
+
+            log.info("Found {} events", events.getTotalElements());
+
+            try {
+                statsClient.saveHit("ewm-main-service", httpRequest.getRequestURI(),
+                        httpRequest.getRemoteAddr(), LocalDateTime.now());
+            } catch (Exception e) {
+                log.warn("Failed to save stats: {}", e.getMessage());
+            }
+
+            return events.getContent().stream()
+                    .map(event -> {
+                        try {
+                            return eventMapper.toEventShortDto(event, getConfirmedRequests(event.getId()), event.getViews());
+                        } catch (Exception e) {
+                            log.error("Error mapping event {}: {}", event.getId(), e.getMessage());
+                            return null;
+                        }
+                    })
+                    .filter(event -> event != null)
+                    .collect(Collectors.toList());
+
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("Error getting public events: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to get public events: " + e.getMessage());
         }
-
-        if (rangeEnd == null) {
-            rangeEnd = LocalDateTime.now().plusYears(10);
-        }
-
-        if (rangeStart.isAfter(rangeEnd)) {
-            throw new BadRequestException("rangeStart must be before rangeEnd");
-        }
-
-        Pageable pageable;
-        if (sort != null && sort.equals("VIEWS")) {
-            pageable = PageRequest.of(from / size, size, Sort.by("views").descending());
-        } else {
-            pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
-        }
-
-        Page<Event> events = eventRepository.findPublicEvents(text, categories, paid, rangeStart, rangeEnd, pageable);
-
-        statsClient.saveHit("ewm-main-service", httpRequest.getRequestURI(),
-                httpRequest.getRemoteAddr(), LocalDateTime.now());
-
-        return events.getContent().stream()
-                .map(event -> eventMapper.toEventShortDto(event, getConfirmedRequests(event.getId()), event.getViews()))
-                .collect(Collectors.toList());
     }
 
     /**
