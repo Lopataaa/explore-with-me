@@ -16,6 +16,7 @@ import ru.practicum.main.event.mapper.EventMapper;
 import ru.practicum.main.event.model.Event;
 import ru.practicum.main.event.model.EventState;
 import ru.practicum.main.event.repository.EventRepository;
+import ru.practicum.main.exception.BadRequestException;
 import ru.practicum.main.exception.ConflictException;
 import ru.practicum.main.exception.NotFoundException;
 import ru.practicum.main.location.mapper.LocationMapper;
@@ -61,15 +62,48 @@ public class EventServiceImpl implements EventService {
     public EventFullDto addEvent(Long userId, NewEventDto newEventDto) {
         log.info("Adding event for user: {}", userId);
 
+        if (newEventDto.getEventDate().isBefore(LocalDateTime.now().plusHours(MIN_HOURS_BEFORE_EVENT))) {
+            throw new BadRequestException("Event date must be at least 2 hours from now");
+        }
+
+        if (newEventDto.getTitle() == null || newEventDto.getTitle().length() < 3) {
+            throw new BadRequestException("Title length must be at least 3");
+        }
+        if (newEventDto.getTitle().length() > 120) {
+            throw new BadRequestException("Title length must be no more than 120");
+        }
+
+        if (newEventDto.getAnnotation() == null || newEventDto.getAnnotation().length() < 20) {
+            throw new BadRequestException("Annotation length must be at least 20");
+        }
+        if (newEventDto.getAnnotation().length() > 2000) {
+            throw new BadRequestException("Annotation length must be no more than 2000");
+        }
+
+        if (newEventDto.getDescription() == null || newEventDto.getDescription().length() < 20) {
+            throw new BadRequestException("Description length must be at least 20");
+        }
+        if (newEventDto.getDescription().length() > 7000) {
+            throw new BadRequestException("Description length must be no more than 7000");
+        }
+
+        if (newEventDto.getParticipantLimit() != null && newEventDto.getParticipantLimit() < 0) {
+            throw new BadRequestException("Participant limit must be greater than or equal to 0");
+        }
+
+        if (newEventDto.getCategory() == null) {
+            throw new BadRequestException("Category must not be null");
+        }
+
+        if (newEventDto.getLocation() == null) {
+            throw new BadRequestException("Location must not be null");
+        }
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User with id=" + userId + " was not found"));
 
         Category category = categoryRepository.findById(newEventDto.getCategory())
                 .orElseThrow(() -> new NotFoundException("Category with id=" + newEventDto.getCategory() + " was not found"));
-
-        if (newEventDto.getEventDate().isBefore(LocalDateTime.now().plusHours(MIN_HOURS_BEFORE_EVENT))) {
-            throw new ConflictException("Event date must be at least 2 hours from now");
-        }
 
         Event event = eventMapper.toEvent(newEventDto);
         event.setInitiator(user);
@@ -144,6 +178,43 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
+        if (request.getEventDate() != null) {
+            if (request.getEventDate().isBefore(LocalDateTime.now().plusHours(MIN_HOURS_BEFORE_EVENT))) {
+                throw new BadRequestException("Event date must be at least 2 hours from now");
+            }
+        }
+
+        if (request.getTitle() != null) {
+            if (request.getTitle().length() < 3) {
+                throw new BadRequestException("Title length must be at least 3");
+            }
+            if (request.getTitle().length() > 120) {
+                throw new BadRequestException("Title length must be no more than 120");
+            }
+        }
+
+        if (request.getAnnotation() != null) {
+            if (request.getAnnotation().length() < 20) {
+                throw new BadRequestException("Annotation length must be at least 20");
+            }
+            if (request.getAnnotation().length() > 2000) {
+                throw new BadRequestException("Annotation length must be no more than 2000");
+            }
+        }
+
+        if (request.getDescription() != null) {
+            if (request.getDescription().length() < 20) {
+                throw new BadRequestException("Description length must be at least 20");
+            }
+            if (request.getDescription().length() > 7000) {
+                throw new BadRequestException("Description length must be no more than 7000");
+            }
+        }
+
+        if (request.getParticipantLimit() != null && request.getParticipantLimit() < 0) {
+            throw new BadRequestException("Participant limit must be greater than or equal to 0");
+        }
+
         if (event.getState() != EventState.PENDING && event.getState() != EventState.CANCELED) {
             throw new ConflictException("Only pending or canceled events can be changed");
         }
@@ -151,32 +222,37 @@ public class EventServiceImpl implements EventService {
         if (request.getAnnotation() != null) {
             event.setAnnotation(request.getAnnotation());
         }
+
         if (request.getCategory() != null) {
             Category category = categoryRepository.findById(request.getCategory())
                     .orElseThrow(() -> new NotFoundException("Category with id=" + request.getCategory() + " was not found"));
             event.setCategory(category);
         }
+
         if (request.getDescription() != null) {
             event.setDescription(request.getDescription());
         }
+
         if (request.getEventDate() != null) {
-            if (request.getEventDate().isBefore(LocalDateTime.now().plusHours(MIN_HOURS_BEFORE_EVENT))) {
-                throw new ConflictException("Event date must be at least 2 hours from now");
-            }
             event.setEventDate(request.getEventDate());
         }
+
         if (request.getLocation() != null) {
             event.setLocation(locationMapper.toLocation(request.getLocation()));
         }
+
         if (request.getPaid() != null) {
             event.setPaid(request.getPaid());
         }
+
         if (request.getParticipantLimit() != null) {
             event.setParticipantLimit(request.getParticipantLimit());
         }
+
         if (request.getRequestModeration() != null) {
             event.setRequestModeration(request.getRequestModeration());
         }
+
         if (request.getTitle() != null) {
             event.setTitle(request.getTitle());
         }
@@ -308,32 +384,75 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
+        if (request.getTitle() != null) {
+            if (request.getTitle().length() < 3) {
+                throw new BadRequestException("Title length must be at least 3");
+            }
+            if (request.getTitle().length() > 120) {
+                throw new BadRequestException("Title length must be no more than 120");
+            }
+        }
+
+        if (request.getAnnotation() != null) {
+            if (request.getAnnotation().length() < 20) {
+                throw new BadRequestException("Annotation length must be at least 20");
+            }
+            if (request.getAnnotation().length() > 2000) {
+                throw new BadRequestException("Annotation length must be no more than 2000");
+            }
+        }
+
+        if (request.getDescription() != null) {
+            if (request.getDescription().length() < 20) {
+                throw new BadRequestException("Description length must be at least 20");
+            }
+            if (request.getDescription().length() > 7000) {
+                throw new BadRequestException("Description length must be no more than 7000");
+            }
+        }
+
+        if (request.getParticipantLimit() != null && request.getParticipantLimit() < 0) {
+            throw new BadRequestException("Participant limit must be greater than or equal to 0");
+        }
+
+        if (request.getEventDate() != null) {
+            event.setEventDate(request.getEventDate());
+        }
+
         if (request.getAnnotation() != null) {
             event.setAnnotation(request.getAnnotation());
         }
+
         if (request.getCategory() != null) {
             Category category = categoryRepository.findById(request.getCategory())
                     .orElseThrow(() -> new NotFoundException("Category with id=" + request.getCategory() + " was not found"));
             event.setCategory(category);
         }
+
         if (request.getDescription() != null) {
             event.setDescription(request.getDescription());
         }
+
         if (request.getEventDate() != null) {
             event.setEventDate(request.getEventDate());
         }
+
         if (request.getLocation() != null) {
             event.setLocation(locationMapper.toLocation(request.getLocation()));
         }
+
         if (request.getPaid() != null) {
             event.setPaid(request.getPaid());
         }
+
         if (request.getParticipantLimit() != null) {
             event.setParticipantLimit(request.getParticipantLimit());
         }
+
         if (request.getRequestModeration() != null) {
             event.setRequestModeration(request.getRequestModeration());
         }
+
         if (request.getTitle() != null) {
             event.setTitle(request.getTitle());
         }
