@@ -13,7 +13,9 @@ public interface RequestRepository extends JpaRepository<Request, Long> {
 
     List<Request> findByRequesterId(Long userId);
 
-    List<Request> findByEventIdAndEventInitiatorId(Long eventId, Long userId);
+    List<Request> findByEventId(Long eventId);
+
+    List<Request> findByEventIdAndStatus(Long eventId, RequestStatus status);
 
     Optional<Request> findByEventIdAndRequesterId(Long eventId, Long userId);
 
@@ -24,9 +26,8 @@ public interface RequestRepository extends JpaRepository<Request, Long> {
 
     Long countByEventIdAndStatus(Long eventId, RequestStatus status);
 
-    List<Request> findByEventIdAndStatus(Long eventId, RequestStatus status);
-
     List<Request> findByIdIn(List<Long> ids);
 
-    List<Request> findByEventId(Long eventId);
+    @Query("SELECT r FROM Request r WHERE r.event.id = :eventId AND r.event.initiator.id = :userId")
+    List<Request> findByEventIdAndEventInitiatorId(@Param("eventId") Long eventId, @Param("userId") Long userId);
 }

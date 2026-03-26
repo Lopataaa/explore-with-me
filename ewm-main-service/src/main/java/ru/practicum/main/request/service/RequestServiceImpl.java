@@ -264,6 +264,7 @@ public class RequestServiceImpl implements RequestService {
      */
     @Override
     public Long getConfirmedRequests(Long eventId) {
+        log.info("Getting confirmed requests count for event: {}", eventId);
         return requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
     }
 

@@ -25,6 +25,7 @@ import ru.practicum.main.user.model.User;
 import ru.practicum.main.user.repository.UserRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -180,12 +181,18 @@ public class EventServiceImpl implements EventService {
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
         if (request.getEventDate() != null) {
+            if (request.getEventDate().isBefore(LocalDateTime.now())) {
+                throw new BadRequestException("Event date must be in the future");
+            }
             if (request.getEventDate().isBefore(LocalDateTime.now().plusHours(MIN_HOURS_BEFORE_EVENT))) {
                 throw new BadRequestException("Event date must be at least 2 hours from now");
             }
         }
 
         if (request.getTitle() != null) {
+            if (request.getTitle().isBlank()) {
+                throw new BadRequestException("Title must not be blank");
+            }
             if (request.getTitle().length() < 3) {
                 throw new BadRequestException("Title length must be at least 3");
             }
@@ -195,6 +202,9 @@ public class EventServiceImpl implements EventService {
         }
 
         if (request.getAnnotation() != null) {
+            if (request.getAnnotation().isBlank()) {
+                throw new BadRequestException("Annotation must not be blank");
+            }
             if (request.getAnnotation().length() < 20) {
                 throw new BadRequestException("Annotation length must be at least 20");
             }
@@ -204,6 +214,9 @@ public class EventServiceImpl implements EventService {
         }
 
         if (request.getDescription() != null) {
+            if (request.getDescription().isBlank()) {
+                throw new BadRequestException("Description must not be blank");
+            }
             if (request.getDescription().length() < 20) {
                 throw new BadRequestException("Description length must be at least 20");
             }
@@ -214,6 +227,12 @@ public class EventServiceImpl implements EventService {
 
         if (request.getParticipantLimit() != null && request.getParticipantLimit() < 0) {
             throw new BadRequestException("Participant limit must be greater than or equal to 0");
+        }
+
+        if (request.getLocation() != null) {
+            if (request.getLocation().getLat() == null || request.getLocation().getLon() == null) {
+                throw new BadRequestException("Location must have lat and lon");
+            }
         }
 
         if (event.getState() != EventState.PENDING && event.getState() != EventState.CANCELED) {
@@ -302,6 +321,10 @@ public class EventServiceImpl implements EventService {
             rangeEnd = LocalDateTime.now().plusYears(10);
         }
 
+        if (rangeStart.isAfter(rangeEnd)) {
+            throw new BadRequestException("rangeStart must be before rangeEnd");
+        }
+
         Pageable pageable;
         if (sort != null && sort.equals("VIEWS")) {
             pageable = PageRequest.of(from / size, size, Sort.by("views").descending());
@@ -310,10 +333,6 @@ public class EventServiceImpl implements EventService {
         }
 
         Page<Event> events = eventRepository.findPublicEvents(text, categories, paid, rangeStart, rangeEnd, pageable);
-
-        if (events == null) {
-            return new ArrayList<>();
-        }
 
         statsClient.saveHit("ewm-main-service", httpRequest.getRequestURI(),
                 httpRequest.getRemoteAddr(), LocalDateTime.now());
@@ -350,13 +369,13 @@ public class EventServiceImpl implements EventService {
     /**
      * Получение событий для администратора с фильтрацией
      *
-     * @param users       список идентификаторов пользователей
-     * @param states      список статусов
-     * @param categories  список категорий
-     * @param rangeStart  начало диапазона дат
-     * @param rangeEnd    конец диапазона дат
-     * @param from        количество элементов для пропуска
-     * @param size        количество элементов на странице
+     * @param users      список идентификаторов пользователей
+     * @param states     список статусов
+     * @param categories список категорий
+     * @param rangeStart начало диапазона дат
+     * @param rangeEnd   конец диапазона дат
+     * @param from       количество элементов для пропуска
+     * @param size       количество элементов на странице
      * @return список DTO с полной информацией о событиях
      */
     @Override
@@ -494,6 +513,11 @@ public class EventServiceImpl implements EventService {
      * @return количество подтвержденных запросов
      */
     private Long getConfirmedRequests(Long eventId) {
-        return requestService.getConfirmedRequests(eventId);
+        try {
+            return requestService.getConfirmedRequests(eventId);
+        } catch (Exception e) {
+            log.warn("Failed to get confirmed requests for event {}: {}", eventId, e.getMessage());
+            return 0L;
+        }
     }
 }
