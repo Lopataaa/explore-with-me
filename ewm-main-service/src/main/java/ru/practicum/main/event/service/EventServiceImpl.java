@@ -27,7 +27,6 @@ import ru.practicum.main.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 

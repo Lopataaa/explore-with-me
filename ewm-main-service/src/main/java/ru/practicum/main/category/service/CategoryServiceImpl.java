@@ -94,8 +94,8 @@ public class CategoryServiceImpl implements CategoryService {
      * @param catId       идентификатор категории
      * @param categoryDto данные для обновления
      * @return DTO обновленной категории
-     * @throws NotFoundException   если категория не найдена
-     * @throws ConflictException   если новое имя уже занято
+     * @throws NotFoundException если категория не найдена
+     * @throws ConflictException если новое имя уже занято
      */
     @Override
     @Transactional
