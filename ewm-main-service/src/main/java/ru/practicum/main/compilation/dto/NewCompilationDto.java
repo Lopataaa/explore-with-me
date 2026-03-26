@@ -18,6 +18,7 @@ public class NewCompilationDto {
 
     private List<Long> events;
 
+    @Builder.Default  // Добавьте эту аннотацию
     private Boolean pinned = false;
 
     @NotBlank

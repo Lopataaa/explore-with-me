@@ -79,14 +79,17 @@ public class RequestServiceImpl implements RequestService {
             throw new ConflictException("The participant limit has been reached");
         }
 
+        RequestStatus status = event.getRequestModeration() ? RequestStatus.PENDING : RequestStatus.CONFIRMED;
+
         Request request = Request.builder()
                 .event(event)
                 .requester(user)
                 .created(LocalDateTime.now())
-                .status(event.getRequestModeration() ? RequestStatus.PENDING : RequestStatus.CONFIRMED)
+                .status(status)
                 .build();
 
         request = requestRepository.save(request);
+        log.info("Request created with id: {}", request.getId());
 
         return requestMapper.toParticipationRequestDto(request);
     }
@@ -157,7 +160,7 @@ public class RequestServiceImpl implements RequestService {
             throw new NotFoundException("Event with id=" + eventId + " was not found");
         }
 
-        return requestRepository.findByEventIdAndEventInitiatorId(eventId, userId)
+        return requestRepository.findByEventId(eventId)
                 .stream()
                 .map(requestMapper::toParticipationRequestDto)
                 .collect(Collectors.toList());
@@ -193,7 +196,7 @@ public class RequestServiceImpl implements RequestService {
             throw new NotFoundException("Event with id=" + eventId + " was not found");
         }
 
-        List<Request> requests = requestRepository.findByIdIn(request.getRequestIds());
+        List<Request> requests = requestRepository.findAllById(request.getRequestIds());
 
         for (Request req : requests) {
             if (req.getStatus() != RequestStatus.PENDING) {
@@ -220,8 +223,7 @@ public class RequestServiceImpl implements RequestService {
             }
 
             if (limit > 0 && confirmedCount >= limit) {
-                List<Request> pendingRequests = requestRepository
-                        .findByEventIdAndStatus(eventId, RequestStatus.PENDING);
+                List<Request> pendingRequests = requestRepository.findByEventIdAndStatus(eventId, RequestStatus.PENDING);
                 for (Request req : pendingRequests) {
                     if (!requests.contains(req)) {
                         req.setStatus(RequestStatus.REJECTED);
@@ -261,13 +263,19 @@ public class RequestServiceImpl implements RequestService {
     }
 
     /**
-     * Получение всех запросов на участие для списка событий
+     * Получение всех запросов для списка событий
      *
      * @param eventIds список идентификаторов событий
      * @return список DTO запросов на участие
      */
     @Override
     public List<ParticipationRequestDto> getRequestsByEventIds(List<Long> eventIds) {
+        log.info("Getting requests for event ids: {}", eventIds);
+
+        if (eventIds == null || eventIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
         return requestRepository.findByEventIds(eventIds)
                 .stream()
                 .map(requestMapper::toParticipationRequestDto)

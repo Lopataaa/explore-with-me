@@ -18,6 +18,9 @@ import ru.practicum.main.exception.NotFoundException;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Реализация сервиса для работы с категориями событий
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -28,10 +31,17 @@ public class CategoryServiceImpl implements CategoryService {
     private final EventRepository eventRepository;
     private final CategoryMapper categoryMapper;
 
+    /**
+     * Создание новой категории
+     *
+     * @param newCategoryDto данные для создания категории
+     * @return DTO созданной категории
+     * @throws ConflictException если категория с таким именем уже существует
+     */
     @Override
     @Transactional
     public CategoryDto addCategory(NewCategoryDto newCategoryDto) {
-        log.info("Adding new category: {}", newCategoryDto.getName());
+        log.info("Adding category: {}", newCategoryDto);
 
         if (categoryRepository.existsByName(newCategoryDto.getName())) {
             throw new ConflictException("Category with name " + newCategoryDto.getName() + " already exists");
@@ -43,16 +53,58 @@ public class CategoryServiceImpl implements CategoryService {
         return categoryMapper.toCategoryDto(category);
     }
 
+    /**
+     * Получение списка категорий с пагинацией
+     *
+     * @param from количество элементов для пропуска
+     * @param size количество элементов на странице
+     * @return список DTO категорий
+     */
     @Override
-    @Transactional
-    public CategoryDto updateCategory(Long catId, CategoryDto categoryDto) {
-        log.info("Updating category with id: {}", catId);
+    public List<CategoryDto> getCategories(Integer from, Integer size) {
+        log.info("Getting categories with from: {}, size: {}", from, size);
+
+        Pageable pageable = PageRequest.of(from / size, size);
+        return categoryRepository.findAll(pageable).getContent().stream()
+                .map(categoryMapper::toCategoryDto)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Получение категории по идентификатору
+     *
+     * @param catId идентификатор категории
+     * @return DTO категории
+     * @throws NotFoundException если категория не найдена
+     */
+    @Override
+    public CategoryDto getCategoryById(Long catId) {
+        log.info("Getting category by id: {}", catId);
 
         Category category = categoryRepository.findById(catId)
                 .orElseThrow(() -> new NotFoundException("Category with id=" + catId + " was not found"));
 
-        if (!category.getName().equals(categoryDto.getName())
-                && categoryRepository.existsByName(categoryDto.getName())) {
+        return categoryMapper.toCategoryDto(category);
+    }
+
+    /**
+     * Обновление категории
+     *
+     * @param catId       идентификатор категории
+     * @param categoryDto данные для обновления
+     * @return DTO обновленной категории
+     * @throws NotFoundException   если категория не найдена
+     * @throws ConflictException   если новое имя уже занято
+     */
+    @Override
+    @Transactional
+    public CategoryDto updateCategory(Long catId, CategoryDto categoryDto) {
+        log.info("Updating category with id: {}, name: {}", catId, categoryDto.getName());
+
+        Category category = categoryRepository.findById(catId)
+                .orElseThrow(() -> new NotFoundException("Category with id=" + catId + " was not found"));
+
+        if (!category.getName().equals(categoryDto.getName()) && categoryRepository.existsByName(categoryDto.getName())) {
             throw new ConflictException("Category with name " + categoryDto.getName() + " already exists");
         }
 
@@ -62,6 +114,13 @@ public class CategoryServiceImpl implements CategoryService {
         return categoryMapper.toCategoryDto(category);
     }
 
+    /**
+     * Удаление категории
+     *
+     * @param catId идентификатор категории
+     * @throws NotFoundException если категория не найдена
+     * @throws ConflictException если к категории привязаны события
+     */
     @Override
     @Transactional
     public void deleteCategory(Long catId) {
@@ -75,27 +134,5 @@ public class CategoryServiceImpl implements CategoryService {
         }
 
         categoryRepository.delete(category);
-    }
-
-    @Override
-    public List<CategoryDto> getCategories(Integer from, Integer size) {
-        log.info("Getting categories from: {}, size: {}", from, size);
-
-        Pageable pageable = PageRequest.of(from / size, size);
-
-        return categoryRepository.findAll(pageable)
-                .stream()
-                .map(categoryMapper::toCategoryDto)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public CategoryDto getCategoryById(Long catId) {
-        log.info("Getting category with id: {}", catId);
-
-        Category category = categoryRepository.findById(catId)
-                .orElseThrow(() -> new NotFoundException("Category with id=" + catId + " was not found"));
-
-        return categoryMapper.toCategoryDto(category);
     }
 }

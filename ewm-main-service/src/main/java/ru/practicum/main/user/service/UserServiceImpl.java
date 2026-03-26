@@ -17,6 +17,9 @@ import ru.practicum.main.user.repository.UserRepository;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Реализация сервиса для работы с пользователями
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -26,42 +29,66 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
 
+    /**
+     * Регистрация нового пользователя
+     *
+     * @param newUserRequest данные для регистрации
+     * @return DTO зарегистрированного пользователя
+     * @throws ConflictException если пользователь с таким email уже существует
+     */
     @Override
     @Transactional
-    public UserDto registerUser(NewUserRequest request) {
-        log.info("Registering new user with email: {}", request.getEmail());
+    public UserDto registerUser(NewUserRequest newUserRequest) {
+        log.info("Registering user: {}", newUserRequest);
 
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ConflictException("User with email " + request.getEmail() + " already exists");
+        if (userRepository.existsByEmail(newUserRequest.getEmail())) {
+            throw new ConflictException("User with email " + newUserRequest.getEmail() + " already exists");
         }
 
-        User user = userMapper.toUser(request);
+        User user = userMapper.toUser(newUserRequest);
         user = userRepository.save(user);
 
         return userMapper.toUserDto(user);
     }
 
+    /**
+     * Получение списка пользователей
+     *
+     * @param ids  список идентификаторов пользователей (если null - все пользователи)
+     * @param from количество элементов для пропуска
+     * @param size количество элементов на странице
+     * @return список DTO пользователей
+     */
     @Override
     public List<UserDto> getUsers(List<Long> ids, Integer from, Integer size) {
         log.info("Getting users with ids: {}, from: {}, size: {}", ids, from, size);
 
-        Pageable pageable = PageRequest.of(from / size, size);
+        if (ids != null && !ids.isEmpty()) {
+            return userRepository.findAllById(ids).stream()
+                    .map(userMapper::toUserDto)
+                    .collect(Collectors.toList());
+        }
 
-        return userRepository.findUsersByIds(ids, pageable)
-                .stream()
+        Pageable pageable = PageRequest.of(from / size, size);
+        return userRepository.findAll(pageable).getContent().stream()
                 .map(userMapper::toUserDto)
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Удаление пользователя
+     *
+     * @param userId идентификатор пользователя
+     * @throws NotFoundException если пользователь не найден
+     */
     @Override
     @Transactional
     public void deleteUser(Long userId) {
         log.info("Deleting user with id: {}", userId);
 
-        if (!userRepository.existsById(userId)) {
-            throw new NotFoundException("User with id=" + userId + " was not found");
-        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User with id=" + userId + " was not found"));
 
-        userRepository.deleteById(userId);
+        userRepository.delete(user);
     }
 }
