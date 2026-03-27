@@ -190,21 +190,9 @@ public class EventServiceImpl implements EventService {
                 throw new BadRequestException("Event date must be in the future");
             }
 
-            LocalDateTime minDate = now.plusHours(2);
+            LocalDateTime minDate = now.plusHours(MIN_HOURS_BEFORE_EVENT);
             if (eventDate.isBefore(minDate)) {
                 log.warn("Attempt to set event date too soon: {} (min: {})", eventDate, minDate);
-                throw new BadRequestException("Event date must be at least 2 hours from now");
-            }
-        }
-
-        if (request.getEventDate() != null) {
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime eventDate = request.getEventDate();
-
-            if (eventDate.isBefore(now)) {
-                throw new BadRequestException("Event date must be in the future");
-            }
-            if (eventDate.isBefore(now.plusHours(MIN_HOURS_BEFORE_EVENT))) {
                 throw new BadRequestException("Event date must be at least 2 hours from now");
             }
         }
