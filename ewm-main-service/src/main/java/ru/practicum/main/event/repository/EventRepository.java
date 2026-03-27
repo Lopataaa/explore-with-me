@@ -26,8 +26,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             "WHERE (:users IS NULL OR e.initiator.id IN :users) " +
             "AND (:states IS NULL OR e.state IN :states) " +
             "AND (:categories IS NULL OR e.category.id IN :categories) " +
-            "AND (CAST(:rangeStart AS date) IS NULL OR e.eventDate >= :rangeStart) " +
-            "AND (CAST(:rangeEnd AS date) IS NULL OR e.eventDate <= :rangeEnd)")
+            "AND e.eventDate >= :rangeStart " +
+            "AND e.eventDate <= :rangeEnd")
     Page<Event> findAdminEvents(@Param("users") List<Long> users,
                                 @Param("states") List<EventState> states,
                                 @Param("categories") List<Long> categories,
@@ -36,7 +36,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                                 Pageable pageable);
 
     @Query("SELECT e FROM Event e " +
-            "WHERE e.state = ru.practicum.main.event.model.EventState.PUBLISHED " +
+            "WHERE e.state = 'PUBLISHED' " +
             "AND (:text IS NULL OR (LOWER(e.annotation) LIKE LOWER(CONCAT('%', :text, '%')) " +
             "OR LOWER(e.description) LIKE LOWER(CONCAT('%', :text, '%')))) " +
             "AND (:categories IS NULL OR e.category.id IN :categories) " +
