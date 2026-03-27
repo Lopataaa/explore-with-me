@@ -27,6 +27,7 @@ import ru.practicum.main.user.repository.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -169,7 +170,8 @@ public class EventServiceImpl implements EventService {
      * @param request данные для обновления
      * @return DTO с обновленной информацией о событии
      * @throws NotFoundException если событие не найдено
-     * @throws ConflictException если событие нельзя редактировать или дата не соответствует правилам
+     * @throws BadRequestException если данные не проходят валидацию
+     * @throws ConflictException если событие нельзя редактировать
      */
     @Override
     @Transactional
@@ -231,6 +233,12 @@ public class EventServiceImpl implements EventService {
             throw new BadRequestException("Participant limit must be greater than or equal to 0");
         }
 
+        if (request.getLocation() != null) {
+            if (request.getLocation().getLat() == null || request.getLocation().getLon() == null) {
+                throw new BadRequestException("Location must have lat and lon");
+            }
+        }
+
         if (event.getState() != EventState.PENDING && event.getState() != EventState.CANCELED) {
             throw new ConflictException("Only pending or canceled events can be changed");
         }
@@ -284,7 +292,9 @@ public class EventServiceImpl implements EventService {
         event = eventRepository.save(event);
         log.info("Event updated: {}", event.getId());
 
-        return eventMapper.toEventFullDto(event, getConfirmedRequests(eventId), event.getViews());
+        Long confirmedRequests = getConfirmedRequests(eventId);
+
+        return eventMapper.toEventFullDto(event, confirmedRequests, event.getViews());
     }
 
     /**
@@ -307,18 +317,14 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
-        log.info("Getting public events with params: text={}, categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}, from={}, size={}",
-                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
+        log.info("Getting public events");
 
         try {
             if (rangeStart == null) {
                 rangeStart = LocalDateTime.now();
-                log.debug("rangeStart set to current time: {}", rangeStart);
             }
-
             if (rangeEnd == null) {
                 rangeEnd = LocalDateTime.now().plusYears(10);
-                log.debug("rangeEnd set to +10 years: {}", rangeEnd);
             }
 
             if (rangeStart.isAfter(rangeEnd)) {
@@ -332,36 +338,27 @@ public class EventServiceImpl implements EventService {
                 pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
             }
 
-            log.debug("Executing query with pageable: {}", pageable);
-
             Page<Event> events = eventRepository.findPublicEvents(text, categories, paid, rangeStart, rangeEnd, pageable);
 
             log.info("Found {} events", events.getTotalElements());
 
-//            try {
-//                statsClient.saveHit("ewm-main-service", httpRequest.getRequestURI(),
-//                        httpRequest.getRemoteAddr(), LocalDateTime.now());
-//            } catch (Exception e) {
-//                log.warn("Failed to save stats: {}", e.getMessage());
-//            }
+            // statsClient временно отключен для отладки
+            // try {
+            //     statsClient.saveHit("ewm-main-service", httpRequest.getRequestURI(),
+            //             httpRequest.getRemoteAddr(), LocalDateTime.now());
+            // } catch (Exception e) {
+            //     log.warn("Failed to save stats: {}", e.getMessage());
+            // }
 
             return events.getContent().stream()
-                    .map(event -> {
-                        try {
-                            return eventMapper.toEventShortDto(event, getConfirmedRequests(event.getId()), event.getViews());
-                        } catch (Exception e) {
-                            log.error("Error mapping event {}: {}", event.getId(), e.getMessage());
-                            return null;
-                        }
-                    })
-                    .filter(event -> event != null)
+                    .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
                     .collect(Collectors.toList());
 
         } catch (BadRequestException e) {
             throw e;
         } catch (Exception e) {
             log.error("Error getting public events: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to get public events: " + e.getMessage());
+            return new ArrayList<>();
         }
     }
 

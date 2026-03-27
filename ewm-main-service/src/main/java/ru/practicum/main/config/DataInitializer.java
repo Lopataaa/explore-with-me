@@ -27,35 +27,51 @@ public class DataInitializer {
 
     @EventListener(ApplicationReadyEvent.class)
     public void init() {
-        log.info("Initializing test data...");
+        log.info("=== INITIALIZING TEST DATA ===");
 
-        Category category;
-        if (categoryRepository.count() == 0) {
-            category = Category.builder().name("Концерты").build();
-            category = categoryRepository.save(category);
-            log.info("Created test category: {}", category);
-        } else {
-            category = categoryRepository.findAll().get(0);
+        try {
+            Category category = categoryRepository.save(
+                    Category.builder().name("Концерты").build()
+            );
+            log.info("Created category: id={}", category.getId());
+
+            User user = userRepository.save(
+                    User.builder()
+                            .name("Test User")
+                            .email("test@example.com")
+                            .build()
+            );
+            log.info("Created user: id={}", user.getId());
+
+            Location location = Location.builder()
+                    .lat(55.754167f)
+                    .lon(37.62f)
+                    .build();
+
+            Event event = Event.builder()
+                    .annotation("Тестовое событие для проверки API")
+                    .category(category)
+                    .description("Полное описание тестового события")
+                    .eventDate(LocalDateTime.now().plusDays(30))
+                    .initiator(user)
+                    .location(location)
+                    .paid(false)
+                    .participantLimit(10)
+                    .requestModeration(true)
+                    .title("Тестовое событие")
+                    .createdOn(LocalDateTime.now())
+                    .publishedOn(LocalDateTime.now())
+                    .state(EventState.PUBLISHED)
+                    .views(0L)
+                    .build();
+
+            eventRepository.save(event);
+            log.info("Created published event");
+
+        } catch (Exception e) {
+            log.error("Error creating test data: {}", e.getMessage());
         }
 
-        User user;
-        if (userRepository.count() == 0) {
-            user = User.builder().name("Test User").email("test@example.com").build();
-            user = userRepository.save(user);
-            log.info("Created test user: {}", user);
-        } else {
-            user = userRepository.findAll().get(0);
-        }
-
-        if (eventRepository.count() == 0) {
-            Location location = Location.builder().lat(55.754167f).lon(37.62f).build();
-
-            Event event = Event.builder().annotation("Тестовое событие для проверки публичного API").category(category).description("Полное описание тестового события для проверки работы публичных эндпоинтов").eventDate(LocalDateTime.now().plusDays(1)).initiator(user).location(location).paid(false).participantLimit(10).requestModeration(true).title("Тестовое событие").createdOn(LocalDateTime.now()).publishedOn(LocalDateTime.now()).state(EventState.PUBLISHED).views(0L).build();
-
-            event = eventRepository.save(event);
-            log.info("Created published test event: {}", event);
-        }
-
-        log.info("Test data initialization completed");
+        log.info("=== TEST DATA INITIALIZATION COMPLETE ===");
     }
 }
