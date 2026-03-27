@@ -179,22 +179,18 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
-        // ==================== ВАЛИДАЦИЯ ДАТЫ (400 BAD REQUEST) ====================
         if (request.getEventDate() != null) {
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime eventDate = request.getEventDate();
 
-            // Проверка, что дата не в прошлом
             if (eventDate.isBefore(now)) {
                 throw new BadRequestException("Event date must be in the future");
             }
-            // Проверка, что дата не раньше чем через 2 часа
             if (eventDate.isBefore(now.plusHours(MIN_HOURS_BEFORE_EVENT))) {
                 throw new BadRequestException("Event date must be at least 2 hours from now");
             }
         }
 
-        // ==================== ВАЛИДАЦИЯ ЗАГОЛОВКА ====================
         if (request.getTitle() != null) {
             if (request.getTitle().isBlank()) {
                 throw new BadRequestException("Title must not be blank");
@@ -207,7 +203,6 @@ public class EventServiceImpl implements EventService {
             }
         }
 
-        // ==================== ВАЛИДАЦИЯ АННОТАЦИИ ====================
         if (request.getAnnotation() != null) {
             if (request.getAnnotation().isBlank()) {
                 throw new BadRequestException("Annotation must not be blank");
@@ -220,7 +215,6 @@ public class EventServiceImpl implements EventService {
             }
         }
 
-        // ==================== ВАЛИДАЦИЯ ОПИСАНИЯ ====================
         if (request.getDescription() != null) {
             if (request.getDescription().isBlank()) {
                 throw new BadRequestException("Description must not be blank");
@@ -233,17 +227,14 @@ public class EventServiceImpl implements EventService {
             }
         }
 
-        // ==================== ВАЛИДАЦИЯ ЛИМИТА УЧАСТНИКОВ ====================
         if (request.getParticipantLimit() != null && request.getParticipantLimit() < 0) {
             throw new BadRequestException("Participant limit must be greater than or equal to 0");
         }
 
-        // ==================== БИЗНЕС-ЛОГИКА (409 CONFLICT) ====================
         if (event.getState() != EventState.PENDING && event.getState() != EventState.CANCELED) {
             throw new ConflictException("Only pending or canceled events can be changed");
         }
 
-        // ==================== ОБНОВЛЕНИЕ ПОЛЕЙ ====================
         if (request.getAnnotation() != null) {
             event.setAnnotation(request.getAnnotation());
         }
@@ -488,10 +479,6 @@ public class EventServiceImpl implements EventService {
 
         if (request.getDescription() != null) {
             event.setDescription(request.getDescription());
-        }
-
-        if (request.getEventDate() != null) {
-            event.setEventDate(request.getEventDate());
         }
 
         if (request.getLocation() != null) {
