@@ -169,9 +169,9 @@ public class EventServiceImpl implements EventService {
      * @param eventId идентификатор события
      * @param request данные для обновления
      * @return DTO с обновленной информацией о событии
-     * @throws NotFoundException если событие не найдено
+     * @throws NotFoundException   если событие не найдено
      * @throws BadRequestException если данные не проходят валидацию
-     * @throws ConflictException если событие нельзя редактировать
+     * @throws ConflictException   если событие нельзя редактировать
      */
     @Override
     @Transactional
@@ -180,6 +180,22 @@ public class EventServiceImpl implements EventService {
 
         Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+
+        if (request.getEventDate() != null) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime eventDate = request.getEventDate();
+
+            if (eventDate.isBefore(now)) {
+                log.warn("Attempt to set event date in the past: {} (current time: {})", eventDate, now);
+                throw new BadRequestException("Event date must be in the future");
+            }
+
+            LocalDateTime minDate = now.plusHours(MIN_HOURS_BEFORE_EVENT);
+            if (eventDate.isBefore(minDate)) {
+                log.warn("Attempt to set event date too soon: {} (min date: {})", eventDate, minDate);
+                throw new BadRequestException("Event date must be at least 2 hours from now");
+            }
+        }
 
         if (request.getEventDate() != null) {
             LocalDateTime now = LocalDateTime.now();
@@ -317,47 +333,25 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
-        log.info("Getting public events");
+        log.info("=== GET PUBLIC EVENTS ===");
 
         try {
-            if (rangeStart == null) {
-                rangeStart = LocalDateTime.now();
-            }
-            if (rangeEnd == null) {
-                rangeEnd = LocalDateTime.now().plusYears(10);
-            }
+            Pageable pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
 
-            if (rangeStart.isAfter(rangeEnd)) {
-                throw new BadRequestException("rangeStart must be before rangeEnd");
-            }
-
-            Pageable pageable;
-            if (sort != null && sort.equals("VIEWS")) {
-                pageable = PageRequest.of(from / size, size, Sort.by("views").descending());
-            } else {
-                pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
-            }
-
-            Page<Event> events = eventRepository.findPublicEvents(text, categories, paid, rangeStart, rangeEnd, pageable);
+            Page<Event> events = eventRepository.findByStateAndEventDateAfter(
+                    EventState.PUBLISHED,
+                    LocalDateTime.now(),
+                    pageable
+            );
 
             log.info("Found {} events", events.getTotalElements());
-
-            // statsClient временно отключен для отладки
-            // try {
-            //     statsClient.saveHit("ewm-main-service", httpRequest.getRequestURI(),
-            //             httpRequest.getRemoteAddr(), LocalDateTime.now());
-            // } catch (Exception e) {
-            //     log.warn("Failed to save stats: {}", e.getMessage());
-            // }
 
             return events.getContent().stream()
                     .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
                     .collect(Collectors.toList());
 
-        } catch (BadRequestException e) {
-            throw e;
         } catch (Exception e) {
-            log.error("Error getting public events: {}", e.getMessage(), e);
+            log.error("Error in getPublicEvents: {}", e.getMessage(), e);
             return new ArrayList<>();
         }
     }
