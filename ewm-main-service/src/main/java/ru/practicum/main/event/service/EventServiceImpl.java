@@ -29,6 +29,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -186,13 +187,13 @@ public class EventServiceImpl implements EventService {
             LocalDateTime eventDate = request.getEventDate();
 
             if (eventDate.isBefore(now)) {
-                log.warn("Attempt to set event date in the past: {} (current time: {})", eventDate, now);
+                log.warn("Attempt to set event date in the past: {} (current: {})", eventDate, now);
                 throw new BadRequestException("Event date must be in the future");
             }
 
-            LocalDateTime minDate = now.plusHours(MIN_HOURS_BEFORE_EVENT);
+            LocalDateTime minDate = now.plusHours(2);
             if (eventDate.isBefore(minDate)) {
-                log.warn("Attempt to set event date too soon: {} (min date: {})", eventDate, minDate);
+                log.warn("Attempt to set event date too soon: {} (min: {})", eventDate, minDate);
                 throw new BadRequestException("Event date must be at least 2 hours from now");
             }
         }
@@ -334,20 +335,35 @@ public class EventServiceImpl implements EventService {
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
         log.info("=== GET PUBLIC EVENTS ===");
+        log.info("text={}, categories={}, paid={}, from={}, size={}", text, categories, paid, from, size);
 
         try {
-            Pageable pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
+            LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
+            LocalDateTime end = rangeEnd != null ? rangeEnd : LocalDateTime.now().plusYears(100);
 
-            Page<Event> events = eventRepository.findByStateAndEventDateAfter(
-                    EventState.PUBLISHED,
-                    LocalDateTime.now(),
-                    pageable
-            );
+            log.info("Date range: {} to {}", start, end);
 
-            log.info("Found {} events", events.getTotalElements());
+            Pageable pageable = PageRequest.of(from / size, size);
+
+            Page<Event> events = eventRepository.findPublicEvents(text, categories, paid, start, end, pageable);
+
+            log.info("Found {} events out of total {}", events.getNumberOfElements(), events.getTotalElements());
+
+            events.getContent().forEach(event -> {
+                log.info("Event: id={}, title={}, annotation={}",
+                        event.getId(), event.getTitle(), event.getAnnotation());
+            });
 
             return events.getContent().stream()
-                    .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
+                    .map(event -> {
+                        try {
+                            return eventMapper.toEventShortDto(event, 0L, event.getViews());
+                        } catch (Exception e) {
+                            log.error("Error mapping event {}: {}", event.getId(), e.getMessage());
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
 
         } catch (Exception e) {
@@ -396,13 +412,31 @@ public class EventServiceImpl implements EventService {
     public List<EventFullDto> getAdminEvents(List<Long> users, List<EventState> states, List<Long> categories,
                                              LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                              Integer from, Integer size) {
-        log.info("Getting admin events");
+        log.info("Getting admin events: users={}, states={}, categories={}, from={}, size={}",
+                users, states, categories, from, size);
+
+        if (rangeStart == null) {
+            rangeStart = LocalDateTime.now().minusYears(100);
+        }
+        if (rangeEnd == null) {
+            rangeEnd = LocalDateTime.now().plusYears(100);
+        }
 
         Pageable pageable = PageRequest.of(from / size, size);
         Page<Event> events = eventRepository.findAdminEvents(users, states, categories, rangeStart, rangeEnd, pageable);
 
+        log.info("Found {} admin events", events.getTotalElements());
+
         return events.getContent().stream()
-                .map(event -> eventMapper.toEventFullDto(event, getConfirmedRequests(event.getId()), event.getViews()))
+                .map(event -> {
+                    try {
+                        return eventMapper.toEventFullDto(event, getConfirmedRequests(event.getId()), event.getViews());
+                    } catch (Exception e) {
+                        log.error("Error mapping event {}: {}", event.getId(), e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
