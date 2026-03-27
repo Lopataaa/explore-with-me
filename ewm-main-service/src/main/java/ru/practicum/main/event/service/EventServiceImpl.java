@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.main.category.model.Category;
@@ -322,7 +323,7 @@ public class EventServiceImpl implements EventService {
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
         log.info("=== GET PUBLIC EVENTS ===");
-        log.info("text={}, categories={}, paid={}, from={}, size={}", text, categories, paid, from, size);
+        log.info("Params: text={}, categories={}, paid={}, from={}, size={}", text, categories, paid, from, size);
 
         try {
             LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
@@ -330,16 +331,20 @@ public class EventServiceImpl implements EventService {
 
             log.info("Date range: {} to {}", start, end);
 
-            Pageable pageable = PageRequest.of(from / size, size);
+            int page = Math.max(0, from / size);
+            Pageable pageable = PageRequest.of(page, size, Sort.by("eventDate").ascending());
 
             Page<Event> events = eventRepository.findPublicEvents(text, categories, paid, start, end, pageable);
 
-            log.info("Found {} events out of total {}", events.getNumberOfElements(), events.getTotalElements());
+            log.info("Found {} events", events.getTotalElements());
 
-            events.getContent().forEach(event -> {
-                log.info("Event: id={}, title={}, annotation={}",
-                        event.getId(), event.getTitle(), event.getAnnotation());
-            });
+            // statsClient временно отключен
+            // try {
+            //     statsClient.saveHit("ewm-main-service", httpRequest.getRequestURI(),
+            //             httpRequest.getRemoteAddr(), LocalDateTime.now());
+            // } catch (Exception e) {
+            //     log.warn("Failed to save stats: {}", e.getMessage());
+            // }
 
             return events.getContent().stream()
                     .map(event -> {
