@@ -321,39 +321,24 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
-        log.info("=== GET PUBLIC EVENTS (FINAL VERSION) ===");
+        log.info("=== GET PUBLIC EVENTS ===");
 
         try {
             List<Event> allEvents = eventRepository.findAll();
 
             List<Event> publishedEvents = allEvents.stream()
                     .filter(e -> e.getState() == EventState.PUBLISHED)
-                    .filter(e -> e.getEventDate().isAfter(LocalDateTime.now()))
                     .collect(Collectors.toList());
 
             log.info("Found {} published events", publishedEvents.size());
 
-            int start = from;
-            int end = Math.min(from + size, publishedEvents.size());
+            publishedEvents.forEach(e -> {
+                log.info("Event: id={}, title={}, annotation={}",
+                        e.getId(), e.getTitle(), e.getAnnotation());
+            });
 
-            List<Event> resultEvents;
-            if (start < publishedEvents.size()) {
-                resultEvents = publishedEvents.subList(start, end);
-            } else {
-                resultEvents = new ArrayList<>();
-            }
-
-            // statsClient отключен
-            // try {
-            //     statsClient.saveHit("ewm-main-service", httpRequest.getRequestURI(),
-            //             httpRequest.getRemoteAddr(), LocalDateTime.now());
-            // } catch (Exception e) {
-            //     log.warn("Failed to save stats: {}", e.getMessage());
-            // }
-
-            return resultEvents.stream()
+            return publishedEvents.stream()
                     .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
-                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
 
         } catch (Exception e) {
