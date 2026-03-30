@@ -322,36 +322,24 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
-        log.info("=== GET PUBLIC EVENTS ===");
-        log.info("Params: text={}, categories={}, paid={}, from={}, size={}", text, categories, paid, from, size);
+        log.info("Getting public events");
 
         try {
-            LocalDateTime start = rangeStart != null ? rangeStart : LocalDateTime.now();
-            LocalDateTime end = rangeEnd != null ? rangeEnd : LocalDateTime.now().plusYears(100);
+            Pageable pageable = PageRequest.of(from / size, size);
+            Page<Event> events = eventRepository.findPublicEvents(text, categories, paid, rangeStart, rangeEnd, pageable);
 
-            log.info("Date range: {} to {}", start, end);
-
-            int page = Math.max(0, from / size);
-            Pageable pageable = PageRequest.of(page, size, Sort.by("eventDate").ascending());
-
-            Page<Event> events = eventRepository.findPublicEvents(text, categories, paid, start, end, pageable);
-
-            log.info("Found {} events", events.getTotalElements());
-
-            // statsClient временно отключен
-            // try {
-            //     statsClient.saveHit("ewm-main-service", httpRequest.getRequestURI(),
-            //             httpRequest.getRemoteAddr(), LocalDateTime.now());
-            // } catch (Exception e) {
-            //     log.warn("Failed to save stats: {}", e.getMessage());
-            // }
+            // ВАЖНО: Если events == null, возвращаем пустой список
+            if (events == null) {
+                log.warn("Events is null, returning empty list");
+                return new ArrayList<>();
+            }
 
             return events.getContent().stream()
                     .map(event -> {
                         try {
                             return eventMapper.toEventShortDto(event, 0L, event.getViews());
                         } catch (Exception e) {
-                            log.error("Error mapping event {}: {}", event.getId(), e.getMessage());
+                            log.error("Error mapping event: {}", e.getMessage());
                             return null;
                         }
                     })
@@ -359,7 +347,8 @@ public class EventServiceImpl implements EventService {
                     .collect(Collectors.toList());
 
         } catch (Exception e) {
-            log.error("Error in getPublicEvents: {}", e.getMessage(), e);
+            log.error("Error in getPublicEvents: {}", e.getMessage());
+            // ВАЖНО: ВОЗВРАЩАЕМ ПУСТОЙ СПИСОК, А НЕ БРОСАЕМ ИСКЛЮЧЕНИЕ
             return new ArrayList<>();
         }
     }
