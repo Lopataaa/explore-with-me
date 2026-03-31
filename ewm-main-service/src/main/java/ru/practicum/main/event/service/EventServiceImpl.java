@@ -316,18 +316,23 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
-        log.info("=== GET PUBLIC EVENTS (SIMPLIFIED) ===");
+        log.info("=== GET PUBLIC EVENTS ===");
 
         try {
-            List<Event> allEvents = eventRepository.findAll();
+            if (rangeStart == null) {
+                rangeStart = LocalDateTime.now();
+            }
+            if (rangeEnd == null) {
+                rangeEnd = LocalDateTime.now().plusYears(10);
+            }
 
-            List<Event> publishedEvents = allEvents.stream()
-                    .filter(e -> e.getState() == EventState.PUBLISHED)
-                    .collect(Collectors.toList());
+            Pageable pageable = PageRequest.of(from / size, size);
 
-            log.info("Found {} published events", publishedEvents.size());
+            Page<Event> events = eventRepository.findPublicEvents(categories, paid, rangeStart, rangeEnd, pageable);
 
-            return publishedEvents.stream()
+            log.info("Found {} events", events.getTotalElements());
+
+            return events.getContent().stream()
                     .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
                     .collect(Collectors.toList());
 
