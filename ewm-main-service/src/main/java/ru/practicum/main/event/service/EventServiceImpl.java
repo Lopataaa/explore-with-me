@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.main.category.model.Category;
@@ -194,7 +195,18 @@ public class EventServiceImpl implements EventService {
             throw new ConflictException("Cannot change published event");
         }
 
-        validateEventDateForUpdate(request.getEventDate());
+        if (request.getEventDate() != null) {
+            LocalDateTime now = LocalDateTime.now().withNano(0);
+            LocalDateTime eventDate = request.getEventDate().withNano(0);
+
+            if (!eventDate.isAfter(now)) {
+                throw new BadRequestException("Event date cannot be in the past or present");
+            }
+
+            if (eventDate.isBefore(now.plusHours(2))) {
+                throw new BadRequestException("Event date must be at least 2 hours from now");
+            }
+        }
 
         if (request.getTitle() != null) {
             if (request.getTitle().isBlank()) {
@@ -326,16 +338,31 @@ public class EventServiceImpl implements EventService {
                 rangeEnd = LocalDateTime.now().plusYears(10);
             }
 
-            Pageable pageable = PageRequest.of(from / size, size);
+            if (rangeStart.isAfter(rangeEnd)) {
+                throw new BadRequestException("rangeStart must be before rangeEnd");
+            }
+
+            Pageable pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
 
             Page<Event> events = eventRepository.findPublicEvents(categories, paid, rangeStart, rangeEnd, pageable);
 
-            log.info("Found {} events", events.getTotalElements());
+            List<Event> resultEvents = events.getContent();
+            if (onlyAvailable != null && onlyAvailable) {
+                resultEvents = resultEvents.stream()
+                        .filter(e -> {
+                            long confirmed = getConfirmedRequests(e.getId());
+                            return e.getParticipantLimit() == 0 || confirmed < e.getParticipantLimit();
+                        })
+                        .collect(Collectors.toList());
+                log.info("Filtered to {} events with onlyAvailable=true", resultEvents.size());
+            }
 
-            return events.getContent().stream()
-                    .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
+            return resultEvents.stream()
+                    .map(event -> eventMapper.toEventShortDto(event, getConfirmedRequests(event.getId()), event.getViews()))
                     .collect(Collectors.toList());
 
+        } catch (BadRequestException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error in getPublicEvents: {}", e.getMessage(), e);
             return new ArrayList<>();
@@ -453,7 +480,19 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
+        if (request.getEventDate() != null) {
+            LocalDateTime now = LocalDateTime.now().withNano(0);
+            LocalDateTime eventDate = request.getEventDate().withNano(0);
+
+            if (!eventDate.isAfter(now)) {
+                throw new BadRequestException("Event date cannot be in the past or present");
+            }
+        }
+
         if (request.getTitle() != null) {
+            if (request.getTitle().isBlank()) {
+                throw new BadRequestException("Title must not be blank");
+            }
             if (request.getTitle().length() < 3) {
                 throw new BadRequestException("Title length must be at least 3");
             }
@@ -463,6 +502,9 @@ public class EventServiceImpl implements EventService {
         }
 
         if (request.getAnnotation() != null) {
+            if (request.getAnnotation().isBlank()) {
+                throw new BadRequestException("Annotation must not be blank");
+            }
             if (request.getAnnotation().length() < 20) {
                 throw new BadRequestException("Annotation length must be at least 20");
             }
@@ -472,6 +514,9 @@ public class EventServiceImpl implements EventService {
         }
 
         if (request.getDescription() != null) {
+            if (request.getDescription().isBlank()) {
+                throw new BadRequestException("Description must not be blank");
+            }
             if (request.getDescription().length() < 20) {
                 throw new BadRequestException("Description length must be at least 20");
             }
@@ -482,10 +527,6 @@ public class EventServiceImpl implements EventService {
 
         if (request.getParticipantLimit() != null && request.getParticipantLimit() < 0) {
             throw new BadRequestException("Participant limit must be greater than or equal to 0");
-        }
-
-        if (request.getEventDate() != null) {
-            event.setEventDate(request.getEventDate());
         }
 
         if (request.getAnnotation() != null) {
@@ -500,6 +541,10 @@ public class EventServiceImpl implements EventService {
 
         if (request.getDescription() != null) {
             event.setDescription(request.getDescription());
+        }
+
+        if (request.getEventDate() != null) {
+            event.setEventDate(request.getEventDate());
         }
 
         if (request.getLocation() != null) {
@@ -551,7 +596,7 @@ public class EventServiceImpl implements EventService {
      */
     private Long getConfirmedRequests(Long eventId) {
         try {
-            return requestService.getConfirmedRequests(eventId);
+            return eventRepository.countConfirmedRequestsByEventId(eventId);
         } catch (Exception e) {
             log.warn("Failed to get confirmed requests for event {}: {}", eventId, e.getMessage());
             return 0L;
@@ -562,6 +607,7 @@ public class EventServiceImpl implements EventService {
         if (eventDate == null) return;
         LocalDateTime now = LocalDateTime.now().withNano(0);
         LocalDateTime dateToCheck = eventDate.withNano(0);
+
         if (!dateToCheck.isAfter(now)) {
             throw new BadRequestException("Event date cannot be in the past or present");
         }

@@ -52,4 +52,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     @Query("SELECT COUNT(e) FROM Event e WHERE e.state = 'PUBLISHED'")
     long countPublishedEvents();
+
+    @Query("SELECT COUNT(r) FROM Request r WHERE r.event.id = :eventId AND r.status = 'CONFIRMED'")
+    Long countConfirmedRequestsByEventId(@Param("eventId") Long eventId);
 }
