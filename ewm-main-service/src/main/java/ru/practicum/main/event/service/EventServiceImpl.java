@@ -318,38 +318,25 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
-        log.info("Getting public events");
+        log.info("=== GET PUBLIC EVENTS (SIMPLIFIED) ===");
 
-        // Обработка null значений
-        String safeText = text == null ? "" : text.trim();
-        boolean categoriesEmpty = categories == null || categories.isEmpty();
-        List<Long> safeCategories = categoriesEmpty ? Collections.emptyList() : categories;
+        try {
+            List<Event> allEvents = eventRepository.findAll();
 
-        // Установка значений по умолчанию
-        if (rangeStart == null) rangeStart = LocalDateTime.now();
-        if (rangeEnd == null) rangeEnd = DEFAULT_END;
+            List<Event> publishedEvents = allEvents.stream()
+                    .filter(e -> e.getState() == EventState.PUBLISHED)
+                    .collect(Collectors.toList());
 
-        // Валидация дат
-        if (rangeStart.isAfter(rangeEnd)) {
-            throw new BadRequestException("rangeStart must be before rangeEnd");
-        }
+            log.info("Found {} published events", publishedEvents.size());
 
-        // Пагинация
-        Pageable pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
+            return publishedEvents.stream()
+                    .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
+                    .collect(Collectors.toList());
 
-        // Получение событий
-        List<Event> events = eventRepository.findPublishedEvents(
-                safeText, safeCategories, categoriesEmpty, paid,
-                rangeStart, rangeEnd, onlyAvailable,
-                EventState.PUBLISHED, pageable);
-
-        if (events.isEmpty()) {
+        } catch (Exception e) {
+            log.error("Error in getPublicEvents: {}", e.getMessage(), e);
             return new ArrayList<>();
         }
-
-        return events.stream()
-                .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
-                .collect(Collectors.toList());
     }
 
     /**
