@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.main.category.model.Category;
@@ -27,6 +28,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -49,6 +51,7 @@ public class EventServiceImpl implements EventService {
     private final StatsClient statsClient;
 
     private static final int MIN_HOURS_BEFORE_EVENT = 2;
+    private static final LocalDateTime DEFAULT_END = LocalDateTime.now().plusYears(100);
 
     /**
      * Добавление нового события
@@ -178,24 +181,22 @@ public class EventServiceImpl implements EventService {
     public EventFullDto updateUserEvent(Long userId, Long eventId, UpdateEventUserRequest request) {
         log.info("Updating event {} for user: {}", eventId, userId);
 
-        Event event = eventRepository.findByIdAndInitiatorId(eventId, userId)
+        if (!userRepository.existsById(userId)) {
+            throw new NotFoundException("User with id=" + userId + " was not found");
+        }
+
+        Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
 
-        if (request.getEventDate() != null) {
-            LocalDateTime now = LocalDateTime.now();
-            LocalDateTime eventDate = request.getEventDate();
-
-            if (eventDate.isBefore(now)) {
-                log.warn("Attempt to set event date in the past: {} (current: {})", eventDate, now);
-                throw new BadRequestException("Event date must be in the future");
-            }
-
-            LocalDateTime minDate = now.plusHours(MIN_HOURS_BEFORE_EVENT);
-            if (eventDate.isBefore(minDate)) {
-                log.warn("Attempt to set event date too soon: {} (min: {})", eventDate, minDate);
-                throw new BadRequestException("Event date must be at least 2 hours from now");
-            }
+        if (!event.getInitiator().getId().equals(userId)) {
+            throw new NotFoundException("Event with id=" + eventId + " was not found for user " + userId);
         }
+
+        if (event.getState() == EventState.PUBLISHED) {
+            throw new ConflictException("Cannot change published event");
+        }
+
+        validateEventDateForUpdate(request.getEventDate());
 
         if (request.getTitle() != null) {
             if (request.getTitle().isBlank()) {
@@ -243,18 +244,22 @@ public class EventServiceImpl implements EventService {
             }
         }
 
-        if (event.getState() != EventState.PENDING && event.getState() != EventState.CANCELED) {
-            throw new ConflictException("Only pending or canceled events can be changed");
-        }
-
-        if (request.getAnnotation() != null) {
-            event.setAnnotation(request.getAnnotation());
+        if (request.getStateAction() != null) {
+            if (request.getStateAction() == UpdateEventUserRequest.UserStateAction.SEND_TO_REVIEW) {
+                event.setState(EventState.PENDING);
+            } else if (request.getStateAction() == UpdateEventUserRequest.UserStateAction.CANCEL_REVIEW) {
+                event.setState(EventState.CANCELED);
+            }
         }
 
         if (request.getCategory() != null) {
             Category category = categoryRepository.findById(request.getCategory())
                     .orElseThrow(() -> new NotFoundException("Category with id=" + request.getCategory() + " was not found"));
             event.setCategory(category);
+        }
+
+        if (request.getAnnotation() != null) {
+            event.setAnnotation(request.getAnnotation());
         }
 
         if (request.getDescription() != null) {
@@ -285,14 +290,6 @@ public class EventServiceImpl implements EventService {
             event.setTitle(request.getTitle());
         }
 
-        if (request.getStateAction() != null) {
-            if (request.getStateAction() == UpdateEventUserRequest.UserStateAction.SEND_TO_REVIEW) {
-                event.setState(EventState.PENDING);
-            } else if (request.getStateAction() == UpdateEventUserRequest.UserStateAction.CANCEL_REVIEW) {
-                event.setState(EventState.CANCELED);
-            }
-        }
-
         event = eventRepository.save(event);
         log.info("Event updated: {}", event.getId());
 
@@ -321,30 +318,38 @@ public class EventServiceImpl implements EventService {
                                                LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
-        log.info("=== GET PUBLIC EVENTS ===");
+        log.info("Getting public events");
 
-        try {
-            List<Event> allEvents = eventRepository.findAll();
+        // Обработка null значений
+        String safeText = text == null ? "" : text.trim();
+        boolean categoriesEmpty = categories == null || categories.isEmpty();
+        List<Long> safeCategories = categoriesEmpty ? Collections.emptyList() : categories;
 
-            List<Event> publishedEvents = allEvents.stream()
-                    .filter(e -> e.getState() == EventState.PUBLISHED)
-                    .collect(Collectors.toList());
+        // Установка значений по умолчанию
+        if (rangeStart == null) rangeStart = LocalDateTime.now();
+        if (rangeEnd == null) rangeEnd = DEFAULT_END;
 
-            log.info("Found {} published events", publishedEvents.size());
+        // Валидация дат
+        if (rangeStart.isAfter(rangeEnd)) {
+            throw new BadRequestException("rangeStart must be before rangeEnd");
+        }
 
-            publishedEvents.forEach(e -> {
-                log.info("Event: id={}, title={}, annotation={}",
-                        e.getId(), e.getTitle(), e.getAnnotation());
-            });
+        // Пагинация
+        Pageable pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
 
-            return publishedEvents.stream()
-                    .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
-                    .collect(Collectors.toList());
+        // Получение событий
+        List<Event> events = eventRepository.findPublishedEvents(
+                safeText, safeCategories, categoriesEmpty, paid,
+                rangeStart, rangeEnd, onlyAvailable,
+                EventState.PUBLISHED, pageable);
 
-        } catch (Exception e) {
-            log.error("Error in getPublicEvents: {}", e.getMessage(), e);
+        if (events.isEmpty()) {
             return new ArrayList<>();
         }
+
+        return events.stream()
+                .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -552,12 +557,36 @@ public class EventServiceImpl implements EventService {
     }
 
     /**
-     * Получение количества подтвержденных запросов на участие в событии
-     *
-     * @param eventId идентификатор события
-     * @return количество подтвержденных запросов
+     * Получение количества подтвержденных запросов
      */
     private Long getConfirmedRequests(Long eventId) {
-        return 0L;
+        try {
+            return requestService.getConfirmedRequests(eventId);
+        } catch (Exception e) {
+            log.warn("Failed to get confirmed requests for event {}: {}", eventId, e.getMessage());
+            return 0L;
+        }
+    }
+
+    private void validateEventDateNotPast(LocalDateTime eventDate) {
+        if (eventDate == null) return;
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        LocalDateTime dateToCheck = eventDate.withNano(0);
+        if (!dateToCheck.isAfter(now)) {
+            throw new BadRequestException("Event date cannot be in the past or present");
+        }
+    }
+
+    private void validateEventDateForUpdate(LocalDateTime eventDate) {
+        if (eventDate == null) return;
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        LocalDateTime dateToCheck = eventDate.withNano(0);
+        if (!dateToCheck.isAfter(now)) {
+            throw new BadRequestException("Event date cannot be in the past or present");
+        }
+        LocalDateTime minEventDate = now.plusHours(2);
+        if (dateToCheck.isBefore(minEventDate)) {
+            throw new BadRequestException("Event date must be at least 2 hours from now");
+        }
     }
 }
