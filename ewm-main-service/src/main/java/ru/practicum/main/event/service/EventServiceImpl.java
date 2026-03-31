@@ -20,6 +20,7 @@ import ru.practicum.main.exception.BadRequestException;
 import ru.practicum.main.exception.ConflictException;
 import ru.practicum.main.exception.NotFoundException;
 import ru.practicum.main.location.mapper.LocationMapper;
+import ru.practicum.main.request.model.RequestStatus;
 import ru.practicum.main.request.repository.RequestRepository;
 import ru.practicum.main.request.service.RequestService;
 import ru.practicum.main.user.model.User;
@@ -349,11 +350,11 @@ public class EventServiceImpl implements EventService {
             Page<Event> events = eventRepository.findPublicEvents(categories, paid, rangeStart, rangeEnd, pageable);
 
             List<Event> resultEvents = events.getContent();
+
             if (onlyAvailable != null && onlyAvailable) {
                 resultEvents = resultEvents.stream()
                         .filter(event -> {
-                            long confirmed = getConfirmedRequests(event.getId());
-                            // Событие доступно, если лимит 0 ИЛИ лимит больше чем подтвержденных заявок
+                            long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
                             return event.getParticipantLimit() == 0 || confirmed < event.getParticipantLimit();
                         })
                         .collect(Collectors.toList());
@@ -361,11 +362,12 @@ public class EventServiceImpl implements EventService {
             }
 
             return resultEvents.stream()
-                    .map(event -> eventMapper.toEventShortDto(event, getConfirmedRequests(event.getId()), event.getViews()))
+                    .map(event -> eventMapper.toEventShortDto(
+                            event,
+                            requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED),
+                            event.getViews()))
                     .collect(Collectors.toList());
 
-        } catch (BadRequestException e) {
-            throw e;
         } catch (Exception e) {
             log.error("Error in getPublicEvents: {}", e.getMessage(), e);
             return new ArrayList<>();
@@ -599,7 +601,8 @@ public class EventServiceImpl implements EventService {
      */
     private Long getConfirmedRequests(Long eventId) {
         try {
-            return requestRepository.countConfirmedRequestsByEventId(eventId);
+            Long count = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
+            return count != null ? count : 0L;
         } catch (Exception e) {
             log.warn("Failed to get confirmed requests for event {}: {}", eventId, e.getMessage());
             return 0L;
