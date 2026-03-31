@@ -30,4 +30,7 @@ public interface RequestRepository extends JpaRepository<Request, Long> {
 
     @Query("SELECT r FROM Request r WHERE r.event.id = :eventId AND r.event.initiator.id = :userId")
     List<Request> findByEventIdAndEventInitiatorId(@Param("eventId") Long eventId, @Param("userId") Long userId);
+
+    @Query("SELECT COUNT(r) FROM Request r WHERE r.event.id = :eventId AND r.status = 'CONFIRMED'")
+    Long countConfirmedRequestsByEventId(@Param("eventId") Long eventId);
 }
