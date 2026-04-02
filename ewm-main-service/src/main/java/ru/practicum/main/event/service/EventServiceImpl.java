@@ -20,7 +20,7 @@ import ru.practicum.main.exception.BadRequestException;
 import ru.practicum.main.exception.ConflictException;
 import ru.practicum.main.exception.NotFoundException;
 import ru.practicum.main.location.mapper.LocationMapper;
-import ru.practicum.main.request.model.RequestStatus;
+//import ru.practicum.main.request.model.RequestStatus;
 //import ru.practicum.main.request.repository.RequestRepository;
 import ru.practicum.main.request.service.RequestService;
 import ru.practicum.main.user.model.User;
