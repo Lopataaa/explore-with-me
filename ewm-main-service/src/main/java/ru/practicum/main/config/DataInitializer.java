@@ -30,43 +30,59 @@ public class DataInitializer {
         log.info("=== INITIALIZING TEST DATA ===");
 
         try {
-            Category category = categoryRepository.save(
-                    Category.builder().name("Концерты").build()
-            );
-            log.info("Created category: id={}", category.getId());
+            Category category;
+            if (categoryRepository.count() == 0) {
+                category = categoryRepository.save(
+                        Category.builder().name("Концерты").build()
+                );
+                log.info("Created category: id={}", category.getId());
+            } else {
+                category = categoryRepository.findAll().get(0);
+                log.info("Category already exists: id={}", category.getId());
+            }
 
-            User user = userRepository.save(
-                    User.builder()
-                            .name("Test User")
-                            .email("test@example.com")
-                            .build()
-            );
-            log.info("Created user: id={}", user.getId());
+            User user;
+            if (userRepository.count() == 0) {
+                user = userRepository.save(
+                        User.builder()
+                                .name("Test User")
+                                .email("test@example.com")
+                                .build()
+                );
+                log.info("Created user: id={}", user.getId());
+            } else {
+                user = userRepository.findAll().get(0);
+                log.info("User already exists: id={}", user.getId());
+            }
 
-            Location location = Location.builder()
-                    .lat(55.754167f)
-                    .lon(37.62f)
-                    .build();
+            if (eventRepository.count() == 0) {
+                Location location = Location.builder()
+                        .lat(55.754167f)
+                        .lon(37.62f)
+                        .build();
 
-            Event event = Event.builder()
-                    .annotation("Тестовое событие для проверки API")
-                    .category(category)
-                    .description("Полное описание тестового события")
-                    .eventDate(LocalDateTime.now().plusDays(30))
-                    .initiator(user)
-                    .location(location)
-                    .paid(false)
-                    .participantLimit(10)
-                    .requestModeration(true)
-                    .title("Тестовое событие")
-                    .createdOn(LocalDateTime.now())
-                    .publishedOn(LocalDateTime.now())
-                    .state(EventState.PUBLISHED)
-                    .views(0L)
-                    .build();
+                Event event = Event.builder()
+                        .annotation("Тестовое событие для проверки API")
+                        .category(category)
+                        .description("Полное описание тестового события")
+                        .eventDate(LocalDateTime.now().plusDays(30))
+                        .initiator(user)
+                        .location(location)
+                        .paid(false)
+                        .participantLimit(10)
+                        .requestModeration(true)
+                        .title("Тестовое событие")
+                        .createdOn(LocalDateTime.now())
+                        .publishedOn(LocalDateTime.now())
+                        .state(EventState.PUBLISHED)
+                        .views(0L)
+                        .build();
 
-            eventRepository.save(event);
-            log.info("Created published event");
+                eventRepository.save(event);
+                log.info("Created published event");
+            } else {
+                log.info("Events already exist, count: {}", eventRepository.count());
+            }
 
         } catch (Exception e) {
             log.error("Error creating test data: {}", e.getMessage());
