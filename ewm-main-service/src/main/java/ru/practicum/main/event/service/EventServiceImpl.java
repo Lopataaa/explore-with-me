@@ -1,7 +1,5 @@
 package ru.practicum.main.event.service;
 
-// Проверка прохождения тестов
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -334,42 +332,59 @@ public class EventServiceImpl implements EventService {
                                                Boolean onlyAvailable, String sort,
                                                Integer from, Integer size, HttpServletRequest httpRequest) {
         log.info("=== GET PUBLIC EVENTS ===");
+        log.info("Params: text={}, categories={}, paid={}, rangeStart={}, rangeEnd={}, onlyAvailable={}, sort={}, from={}, size={}",
+                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
 
         try {
             if (rangeStart == null) {
                 rangeStart = LocalDateTime.now();
+                log.debug("rangeStart set to current time: {}", rangeStart);
             }
             if (rangeEnd == null) {
                 rangeEnd = LocalDateTime.now().plusYears(10);
+                log.debug("rangeEnd set to +10 years: {}", rangeEnd);
             }
 
             if (rangeStart.isAfter(rangeEnd)) {
                 throw new BadRequestException("rangeStart must be before rangeEnd");
             }
 
-            Pageable pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
+            Pageable pageable;
+            if (sort != null && sort.equalsIgnoreCase("VIEWS")) {
+                pageable = PageRequest.of(from / size, size, Sort.by("views").descending());
+                log.debug("Sorting by VIEWS descending");
+            } else {
+                pageable = PageRequest.of(from / size, size, Sort.by("eventDate").ascending());
+                log.debug("Sorting by EVENT_DATE ascending");
+            }
 
             Page<Event> events = eventRepository.findPublicEvents(categories, paid, rangeStart, rangeEnd, pageable);
+            log.info("Found {} events from database", events.getTotalElements());
 
-            List<Event> resultEvents = events.getContent();
+            List<Event> resultEvents = new ArrayList<>(events.getContent());
 
             if (onlyAvailable != null && onlyAvailable) {
                 resultEvents = resultEvents.stream()
                         .filter(event -> {
                             long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
-                            return event.getParticipantLimit() == 0 || confirmed < event.getParticipantLimit();
+                            boolean available = event.getParticipantLimit() == 0 || confirmed < event.getParticipantLimit();
+                            log.debug("Event id={}, participantLimit={}, confirmed={}, available={}",
+                                    event.getId(), event.getParticipantLimit(), confirmed, available);
+                            return available;
                         })
                         .collect(Collectors.toList());
                 log.info("Filtered to {} events with onlyAvailable=true", resultEvents.size());
             }
 
             return resultEvents.stream()
-                    .map(event -> eventMapper.toEventShortDto(
-                            event,
-                            requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED),
-                            event.getViews()))
+                    .map(event -> {
+                        long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
+                        return eventMapper.toEventShortDto(event, confirmed, event.getViews());
+                    })
                     .collect(Collectors.toList());
 
+        } catch (BadRequestException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Error in getPublicEvents: {}", e.getMessage(), e);
             return new ArrayList<>();
