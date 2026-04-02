@@ -21,7 +21,7 @@ import ru.practicum.main.exception.ConflictException;
 import ru.practicum.main.exception.NotFoundException;
 import ru.practicum.main.location.mapper.LocationMapper;
 import ru.practicum.main.request.model.RequestStatus;
-import ru.practicum.main.request.repository.RequestRepository;
+//import ru.practicum.main.request.repository.RequestRepository;
 import ru.practicum.main.request.service.RequestService;
 import ru.practicum.main.user.model.User;
 import ru.practicum.main.user.repository.UserRepository;
@@ -50,7 +50,7 @@ public class EventServiceImpl implements EventService {
     private final EventMapper eventMapper;
     private final LocationMapper locationMapper;
     private final StatsClient statsClient;
-    private final RequestRepository requestRepository;
+//    private final RequestRepository requestRepository;
 
     private static final int MIN_HOURS_BEFORE_EVENT = 2;
     private static final LocalDateTime DEFAULT_END = LocalDateTime.now().plusYears(100);
@@ -361,30 +361,25 @@ public class EventServiceImpl implements EventService {
             Page<Event> events = eventRepository.findPublicEvents(categories, paid, rangeStart, rangeEnd, pageable);
             log.info("Found {} events from database", events.getTotalElements());
 
-            List<Event> resultEvents = new ArrayList<>(events.getContent());
+//            List<Event> resultEvents = new ArrayList<>(events.getContent());
 
-            if (onlyAvailable != null && onlyAvailable) {
-                resultEvents = resultEvents.stream()
-                        .filter(event -> {
-                            long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
-                            boolean available = event.getParticipantLimit() == 0 || confirmed < event.getParticipantLimit();
-                            log.debug("Event id={}, participantLimit={}, confirmed={}, available={}",
-                                    event.getId(), event.getParticipantLimit(), confirmed, available);
-                            return available;
-                        })
-                        .collect(Collectors.toList());
-                log.info("Filtered to {} events with onlyAvailable=true", resultEvents.size());
-            }
+//            if (onlyAvailable != null && onlyAvailable) {
+//                resultEvents = resultEvents.stream()
+//                        .filter(event -> {
+//                            long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
+//                            boolean available = event.getParticipantLimit() == 0 || confirmed < event.getParticipantLimit();
+//                            log.debug("Event id={}, participantLimit={}, confirmed={}, available={}",
+//                                    event.getId(), event.getParticipantLimit(), confirmed, available);
+//                            return available;
+//                        })
+//                        .collect(Collectors.toList());
+//                log.info("Filtered to {} events with onlyAvailable=true", resultEvents.size());
+//            }
 
-            return resultEvents.stream()
-                    .map(event -> {
-                        long confirmed = requestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
-                        return eventMapper.toEventShortDto(event, confirmed, event.getViews());
-                    })
+            return events.getContent().stream()
+                    .map(event -> eventMapper.toEventShortDto(event, 0L, event.getViews()))
                     .collect(Collectors.toList());
 
-        } catch (BadRequestException e) {
-            throw e;
         } catch (Exception e) {
             log.error("Error in getPublicEvents: {}", e.getMessage(), e);
             return new ArrayList<>();
@@ -618,8 +613,7 @@ public class EventServiceImpl implements EventService {
      */
     private Long getConfirmedRequests(Long eventId) {
         try {
-            Long count = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
-            return count != null ? count : 0L;
+            return requestService.getConfirmedRequests(eventId);
         } catch (Exception e) {
             log.warn("Failed to get confirmed requests for event {}: {}", eventId, e.getMessage());
             return 0L;
