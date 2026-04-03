@@ -612,17 +612,13 @@ public class EventServiceImpl implements EventService {
      * Получение количества подтвержденных запросов
      */
     private Long getConfirmedRequests(Long eventId) {
-        // Временно всегда возвращаем 1 для теста
-        return 1L;
+        try {
+            return requestService.getConfirmedRequests(eventId);
+        } catch (Exception e) {
+            log.warn("Failed to get confirmed requests for event {}: {}", eventId, e.getMessage());
+            return 0L;
+        }
     }
-//    private Long getConfirmedRequests(Long eventId) {
-//        try {
-//            return requestService.getConfirmedRequests(eventId);
-//        } catch (Exception e) {
-//            log.warn("Failed to get confirmed requests for event {}: {}", eventId, e.getMessage());
-//            return 0L;
-//        }
-//    }
 
     private void validateEventDateNotPast(LocalDateTime eventDate) {
         if (eventDate == null) return;
