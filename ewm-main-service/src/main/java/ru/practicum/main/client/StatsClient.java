@@ -3,7 +3,6 @@ package ru.practicum.main.client;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -11,6 +10,8 @@ import org.springframework.web.util.UriComponentsBuilder;
 import ru.practicum.main.client.dto.EndpointHitDto;
 import ru.practicum.main.client.dto.ViewStats;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -51,9 +52,12 @@ public class StatsClient {
     public List<ViewStats> getStats(LocalDateTime start, LocalDateTime end,
                                     List<String> uris, Boolean unique) {
         try {
+            String encodedStart = URLEncoder.encode(start.format(FORMATTER), StandardCharsets.UTF_8);
+            String encodedEnd = URLEncoder.encode(end.format(FORMATTER), StandardCharsets.UTF_8);
+
             UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(serverUrl + "/stats")
-                    .queryParam("start", start.format(FORMATTER))
-                    .queryParam("end", end.format(FORMATTER))
+                    .queryParam("start", encodedStart)
+                    .queryParam("end", encodedEnd)
                     .queryParam("unique", unique);
 
             if (uris != null && !uris.isEmpty()) {
@@ -63,15 +67,18 @@ public class StatsClient {
             String url = builder.toUriString();
             log.info("Requesting stats from: {}", url);
 
-            ResponseEntity<List<ViewStats>> response = restTemplate.exchange(
+            ResponseEntity<ViewStats[]> response = restTemplate.exchange(
                     url,
                     HttpMethod.GET,
                     null,
-                    new ParameterizedTypeReference<List<ViewStats>>() {
-                    }
+                    ViewStats[].class
             );
 
-            return response.getBody();
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return List.of(response.getBody());
+            }
+            return List.of();
+
         } catch (Exception e) {
             log.error("Error getting stats: {}", e.getMessage());
             return List.of();
@@ -79,7 +86,10 @@ public class StatsClient {
     }
 
     public Long getViews(String uri, LocalDateTime start, LocalDateTime end) {
-        List<ViewStats> stats = getStats(start, end, List.of(uri), true);
-        return stats.isEmpty() ? 0L : stats.get(0).getHits();
+        List<ViewStats> stats = getStats(start, end, List.of(uri), false);
+        if (stats == null || stats.isEmpty()) {
+            return 0L;
+        }
+        return stats.get(0).getHits();
     }
 }
