@@ -213,24 +213,24 @@ public class RequestServiceImpl implements RequestService {
         List<Request> rejected = new ArrayList<>();
 
         if (request.getStatus() == EventRequestStatusUpdateRequest.RequestStatusUpdate.CONFIRMED) {
-            long confirmedCount = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
+            long currentConfirmed = event.getConfirmedRequests();
             int limit = event.getParticipantLimit();
 
             for (Request req : requests) {
-                if (limit == 0 || confirmedCount < limit) {
+                if (limit == 0 || currentConfirmed < limit) {
                     req.setStatus(RequestStatus.CONFIRMED);
                     confirmed.add(req);
-                    confirmedCount++;
+                    currentConfirmed++;
                 } else {
                     req.setStatus(RequestStatus.REJECTED);
                     rejected.add(req);
                 }
             }
 
-            event.setConfirmedRequests(confirmedCount);
+            event.setConfirmedRequests(currentConfirmed);
             eventRepository.save(event);
 
-            if (limit > 0 && confirmedCount >= limit) {
+            if (limit > 0 && currentConfirmed >= limit) {
                 List<Request> pendingRequests = requestRepository.findByEventIdAndStatus(eventId, RequestStatus.PENDING);
                 for (Request req : pendingRequests) {
                     if (!requests.contains(req)) {
@@ -244,10 +244,6 @@ public class RequestServiceImpl implements RequestService {
                 req.setStatus(RequestStatus.REJECTED);
                 rejected.add(req);
             }
-
-            long currentConfirmed = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
-            event.setConfirmedRequests(currentConfirmed);
-            eventRepository.save(event);
         }
 
         requestRepository.saveAll(confirmed);

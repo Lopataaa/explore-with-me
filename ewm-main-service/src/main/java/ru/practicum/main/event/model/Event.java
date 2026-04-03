@@ -65,6 +65,6 @@ public class Event {
     @Column(name = "views")
     private Long views;
 
-    @Column(name = "confirmed_requests")
+    @Column(name = "confirmed_requests", nullable = false)
     private Long confirmedRequests = 0L;
 }
