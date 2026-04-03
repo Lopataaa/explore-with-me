@@ -413,7 +413,11 @@ public class EventServiceImpl implements EventService {
             event.setViews(event.getViews() + 1);
             event = eventRepository.save(event);
 
-            return eventMapper.toEventFullDto(event, 0L, event.getViews());
+            // ПОЛУЧАЕМ confirmedRequests И ЛОГИРУЕМ
+            Long confirmed = getConfirmedRequests(event.getId());
+            log.info("=== getConfirmedRequests returned: {} for eventId: {} ===", confirmed, event.getId());
+
+            return eventMapper.toEventFullDto(event, confirmed, event.getViews());
 
         } catch (NotFoundException e) {
             throw e;
@@ -465,7 +469,8 @@ public class EventServiceImpl implements EventService {
             return resultEvents.stream()
                     .map(event -> {
                         try {
-                            return eventMapper.toEventFullDto(event, 0L, event.getViews());
+                            //return eventMapper.toEventFullDto(event, 0L, event.getViews());
+                            return eventMapper.toEventFullDto(event, getConfirmedRequests(event.getId()), event.getViews());
                         } catch (Exception e) {
                             log.error("Error mapping event {}: {}", event.getId(), e.getMessage());
                             return null;
@@ -612,12 +617,14 @@ public class EventServiceImpl implements EventService {
      * Получение количества подтвержденных запросов
      */
     private Long getConfirmedRequests(Long eventId) {
-        try {
-            return requestService.getConfirmedRequests(eventId);
-        } catch (Exception e) {
-            log.warn("Failed to get confirmed requests for event {}: {}", eventId, e.getMessage());
-            return 0L;
+        log.info("=== getConfirmedRequests called for eventId: {} ===", eventId);
+        Event event = eventRepository.findById(eventId).orElse(null);
+        if (event != null) {
+            log.info("Event found, confirmedRequests from DB: {}", event.getConfirmedRequests());
+            return event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L;
         }
+        log.warn("Event not found for id: {}", eventId);
+        return 0L;
     }
 
     private void validateEventDateNotPast(LocalDateTime eventDate) {

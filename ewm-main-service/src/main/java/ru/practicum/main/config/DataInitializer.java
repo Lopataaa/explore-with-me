@@ -76,6 +76,7 @@ public class DataInitializer {
                         .publishedOn(LocalDateTime.now())
                         .state(EventState.PUBLISHED)
                         .views(0L)
+                        .confirmedRequests(0L)
                         .build();
 
                 eventRepository.save(event);

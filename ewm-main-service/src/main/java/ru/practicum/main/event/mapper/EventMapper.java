@@ -34,6 +34,7 @@ public class EventMapper {
                 .createdOn(LocalDateTime.now())
                 .state(EventState.PENDING)
                 .views(0L)
+                .confirmedRequests(0L)
                 .build();
     }
 
