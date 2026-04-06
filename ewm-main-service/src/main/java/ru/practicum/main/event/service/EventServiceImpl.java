@@ -380,7 +380,11 @@ public class EventServiceImpl implements EventService {
                     .collect(Collectors.toList());
         }
 
-        Map<Long, Long> viewsMap = getViewsForEvents(events);
+        Map<Long, Long> viewsMap = new HashMap<>();
+        for (Event event : events) {
+            Long views = event.getViews() != null ? event.getViews() : 0L;
+            viewsMap.put(event.getId(), views);
+        }
 
         List<EventShortDto> result = events.stream()
                 .map(event -> {
@@ -422,19 +426,28 @@ public class EventServiceImpl implements EventService {
             throw new NotFoundException("Event with id=" + id + " was not found");
         }
 
-        statsClient.saveHit(
-                "ewm-main-service",
-                httpRequest.getRequestURI(),
-                httpRequest.getRemoteAddr(),
-                LocalDateTime.now()
-        );
+        try {
+            statsClient.saveHit(
+                    "ewm-main-service",
+                    httpRequest.getRequestURI(),
+                    httpRequest.getRemoteAddr(),
+                    LocalDateTime.now()
+            );
+        } catch (Exception e) {
+            log.error("Failed to save hit: {}", e.getMessage());
+        }
 
-        LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-        LocalDateTime end = LocalDateTime.now();
-        List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + id), true);
+        Long currentViews = event.getViews();
+        if (currentViews == null) {
+            currentViews = 0L;
+        }
+        event.setViews(currentViews + 1);
+        eventRepository.save(event);
 
-        long views = stats.isEmpty() ? 0L : stats.get(0).getHits();
+        Long views = event.getViews();
         Long confirmedRequests = requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED);
+
+        log.info("Views for event {}: {}", id, views);
 
         return eventMapper.toEventFullDto(event, confirmedRequests, views);
     }
