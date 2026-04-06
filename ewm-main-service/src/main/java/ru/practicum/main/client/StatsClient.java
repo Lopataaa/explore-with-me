@@ -51,8 +51,8 @@ public class StatsClient {
         }
     }
 
-    public ResponseEntity<Object> getStats(LocalDateTime start, LocalDateTime end,
-                                           List<String> uris, Boolean unique) {
+    public List<ViewStats> getStats(LocalDateTime start, LocalDateTime end,
+                                    List<String> uris, Boolean unique) {
         try {
             String encodedStart = URLEncoder.encode(start.format(FORMATTER), StandardCharsets.UTF_8);
             String encodedEnd = URLEncoder.encode(end.format(FORMATTER), StandardCharsets.UTF_8);
@@ -66,17 +66,20 @@ public class StatsClient {
                 builder.queryParam("uris", String.join(",", uris));
             }
 
-            ResponseEntity<Object> response = restTemplate.exchange(
+            ResponseEntity<ViewStats[]> response = restTemplate.exchange(
                     builder.toUriString(),
                     HttpMethod.GET,
                     null,
-                    Object.class
+                    ViewStats[].class
             );
 
-            return response;
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                return Arrays.asList(response.getBody());
+            }
+            return Collections.emptyList();
         } catch (Exception e) {
             log.error("Error getting stats: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            return Collections.emptyList();
         }
     }
 

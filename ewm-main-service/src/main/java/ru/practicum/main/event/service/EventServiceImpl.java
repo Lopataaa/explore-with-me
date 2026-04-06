@@ -1,6 +1,5 @@
 package ru.practicum.main.event.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +8,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.main.category.model.Category;
@@ -661,18 +659,30 @@ public class EventServiceImpl implements EventService {
             return Collections.emptyMap();
         }
 
-        List<String> uris = events.stream()
-                .map(event -> "/events/" + event.getId())
-                .collect(Collectors.toList());
+        try {
+            List<String> uris = events.stream()
+                    .map(event -> "/events/" + event.getId())
+                    .collect(Collectors.toList());
 
-        List<ViewStats> stats = getStats(uris, true);
+            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
+            LocalDateTime end = LocalDateTime.now();
 
-        return stats.stream()
-                .collect(Collectors.toMap(
-                        stat -> Long.parseLong(stat.getUri().substring(stat.getUri().lastIndexOf('/') + 1)),
-                        ViewStats::getHits,
-                        (existing, replacement) -> existing
-                ));
+            List<ViewStats> stats = statsClient.getStats(start, end, uris, true);
+
+            if (stats == null || stats.isEmpty()) {
+                return Collections.emptyMap();
+            }
+
+            return stats.stream()
+                    .collect(Collectors.toMap(
+                            stat -> Long.parseLong(stat.getUri().substring(stat.getUri().lastIndexOf('/') + 1)),
+                            ViewStats::getHits,
+                            (existing, replacement) -> existing
+                    ));
+        } catch (Exception e) {
+            log.error("Error getting views for events: {}", e.getMessage());
+            return Collections.emptyMap();
+        }
     }
 
     /**
@@ -706,28 +716,23 @@ public class EventServiceImpl implements EventService {
         return spec;
     }
 
-    private List<ViewStats> getStats(List<String> uris, Boolean unique) {
-        try {
-            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-            LocalDateTime end = LocalDateTime.now();
-
-            ResponseEntity<Object> response = statsClient.getStats(start, end, uris, unique);
-
-            if (response.getStatusCode().is2xxSuccessful() && response.hasBody()) {
-                return objectMapper.convertValue(response.getBody(), new TypeReference<List<ViewStats>>() {});
-            }
-            return Collections.emptyList();
-        } catch (Exception e) {
-            log.error("Error getting stats: {}", e.getMessage());
-            return Collections.emptyList();
-        }
-    }
-
     /**
      * Получение количества просмотров для одного события
      */
     private Long getEventViewsById(Long eventId) {
-        List<ViewStats> stats = getStats(List.of("/events/" + eventId), true);
-        return stats.isEmpty() ? 0L : stats.get(0).getHits();
+        try {
+            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
+            LocalDateTime end = LocalDateTime.now();
+
+            List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + eventId), true);
+
+            if (stats != null && !stats.isEmpty()) {
+                return stats.get(0).getHits();
+            }
+            return 0L;
+        } catch (Exception e) {
+            log.error("Error getting views for event {}: {}", eventId, e.getMessage());
+            return 0L;
+        }
     }
 }
