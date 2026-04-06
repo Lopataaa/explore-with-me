@@ -324,7 +324,6 @@ public class EventServiceImpl implements EventService {
 
         log.info("Getting public events with filters");
 
-        /*
         try {
             statsClient.saveHit(
                     "ewm-main-service",
@@ -335,8 +334,6 @@ public class EventServiceImpl implements EventService {
         } catch (Exception e) {
             log.error("Failed to save hit: {}", e.getMessage());
         }
-
-         */
 
         if (rangeStart == null && rangeEnd == null) {
             rangeStart = LocalDateTime.now();
@@ -689,23 +686,6 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-//    private Long getEventViews(Long eventId) {
-//        try {
-//            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-//            LocalDateTime end = LocalDateTime.now();
-//
-//            List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + eventId), false);
-//
-//            if (stats != null && !stats.isEmpty()) {
-//                return stats.getFirst().getHits();
-//            }
-//            return 0L;
-//        } catch (Exception e) {
-//            log.error("Error getting views for event {}: {}", eventId, e.getMessage());
-//            return 0L;
-//        }
-//    }
-
     /**
      * Построение спецификации для фильтрации событий
      */
@@ -745,7 +725,7 @@ public class EventServiceImpl implements EventService {
             LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
             LocalDateTime end = LocalDateTime.now();
 
-            List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + eventId), false);
+            List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + eventId), true);
 
             if (stats != null && !stats.isEmpty()) {
                 return stats.get(0).getHits();
