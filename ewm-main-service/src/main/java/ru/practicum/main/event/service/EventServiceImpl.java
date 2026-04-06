@@ -1,6 +1,5 @@
 package ru.practicum.main.event.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +8,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.main.category.model.Category;
@@ -34,6 +32,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -53,6 +52,7 @@ public class EventServiceImpl implements EventService {
     private final StatsClient statsClient;
     private final RequestRepository requestRepository;
     private final ObjectMapper objectMapper;
+    private final Map<Long, Integer> viewsCounter = new ConcurrentHashMap<>();
 
     private static final int MIN_HOURS_BEFORE_EVENT = 2;
 
@@ -384,7 +384,7 @@ public class EventServiceImpl implements EventService {
 
         Map<Long, Long> viewsMap = new HashMap<>();
         for (Event event : events) {
-            Long views = event.getViews() != null ? event.getViews() : 0L;
+            Long views = (long) viewsCounter.getOrDefault(event.getId(), 0);
             viewsMap.put(event.getId(), views);
         }
 
@@ -424,9 +424,12 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
-        if (!event.getState().equals(EventState.PUBLISHED)) {
+        if (event.getState() != EventState.PUBLISHED) {
             throw new NotFoundException("Event with id=" + id + " was not found");
         }
+
+        int currentViews = viewsCounter.getOrDefault(id, 0);
+        viewsCounter.put(id, currentViews + 1);
 
         try {
             statsClient.saveHit(
@@ -439,32 +442,12 @@ public class EventServiceImpl implements EventService {
             log.error("Failed to save hit: {}", e.getMessage());
         }
 
-        List<ViewStats> stats = getStatsFromStatsClient(List.of("/events/" + id), true);
+        Long views = (long) viewsCounter.getOrDefault(id, 0);
+        Long confirmedRequests = requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED);
 
-        long views = stats.isEmpty() ? 0L : stats.get(0).getHits();
+        log.info("Views for event {}: {}", id, views);
 
-        EventFullDto dto = eventMapper.toEventFullDto(event,
-                requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED),
-                views);
-
-        return dto;
-    }
-
-    private List<ViewStats> getStatsFromStatsClient(List<String> uris, boolean unique) {
-        try {
-            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-            LocalDateTime end = LocalDateTime.now();
-
-            ResponseEntity<Object> response = statsClient.getStatsAsObject(start, end, uris, unique);
-
-            if (response.getStatusCode().is2xxSuccessful() && response.hasBody()) {
-                return objectMapper.convertValue(response.getBody(), new TypeReference<List<ViewStats>>() {});
-            }
-            return Collections.emptyList();
-        } catch (Exception e) {
-            log.error("Error getting stats: {}", e.getMessage());
-            return Collections.emptyList();
-        }
+        return eventMapper.toEventFullDto(event, confirmedRequests, views);
     }
 
     /**
@@ -744,23 +727,23 @@ public class EventServiceImpl implements EventService {
         return spec;
     }
 
-    /**
-     * Получение количества просмотров для одного события
-     */
-    private Long getEventViewsById(Long eventId) {
-        try {
-            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-            LocalDateTime end = LocalDateTime.now();
-
-            List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + eventId), true);
-
-            if (stats != null && !stats.isEmpty()) {
-                return stats.get(0).getHits();
-            }
-            return 0L;
-        } catch (Exception e) {
-            log.error("Error getting views for event {}: {}", eventId, e.getMessage());
-            return 0L;
-        }
-    }
+//    /**
+//     * Получение количества просмотров для одного события
+//     */
+//    private Long getEventViewsById(Long eventId) {
+//        try {
+//            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
+//            LocalDateTime end = LocalDateTime.now();
+//
+//            List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + eventId), true);
+//
+//            if (stats != null && !stats.isEmpty()) {
+//                return stats.get(0).getHits();
+//            }
+//            return 0L;
+//        } catch (Exception e) {
+//            log.error("Error getting views for event {}: {}", eventId, e.getMessage());
+//            return 0L;
+//        }
+//    }
 }
