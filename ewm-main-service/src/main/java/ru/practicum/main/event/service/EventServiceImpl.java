@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-//import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,11 +22,8 @@ import ru.practicum.main.exception.BadRequestException;
 import ru.practicum.main.exception.ConflictException;
 import ru.practicum.main.exception.NotFoundException;
 import ru.practicum.main.location.mapper.LocationMapper;
-//import ru.practicum.main.request.model.RequestStatus;
-//import ru.practicum.main.request.repository.RequestRepository;
 import ru.practicum.main.request.model.RequestStatus;
 import ru.practicum.main.request.repository.RequestRepository;
-import ru.practicum.main.request.service.RequestService;
 import ru.practicum.main.user.model.User;
 import ru.practicum.main.user.repository.UserRepository;
 
@@ -49,14 +45,12 @@ public class EventServiceImpl implements EventService {
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
-    //private final RequestService requestService;
     private final EventMapper eventMapper;
     private final LocationMapper locationMapper;
     private final StatsClient statsClient;
     private final RequestRepository requestRepository;
 
     private static final int MIN_HOURS_BEFORE_EVENT = 2;
-    //private static final LocalDateTime DEFAULT_END = LocalDateTime.now().plusYears(100);
 
     /**
      * Добавление нового события
