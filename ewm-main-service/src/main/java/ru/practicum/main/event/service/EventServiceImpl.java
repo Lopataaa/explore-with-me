@@ -1,5 +1,7 @@
 package ru.practicum.main.event.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -7,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.main.category.model.Category;
@@ -49,6 +52,7 @@ public class EventServiceImpl implements EventService {
     private final LocationMapper locationMapper;
     private final StatsClient statsClient;
     private final RequestRepository requestRepository;
+    private final ObjectMapper objectMapper;
 
     private static final int MIN_HOURS_BEFORE_EVENT = 2;
 
@@ -657,33 +661,18 @@ public class EventServiceImpl implements EventService {
             return Collections.emptyMap();
         }
 
-        try {
-            List<String> uris = events.stream()
-                    .map(event -> "/events/" + event.getId())
-                    .collect(Collectors.toList());
+        List<String> uris = events.stream()
+                .map(event -> "/events/" + event.getId())
+                .collect(Collectors.toList());
 
-            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-            LocalDateTime end = LocalDateTime.now();
+        List<ViewStats> stats = getStats(uris, true);
 
-            List<ViewStats> stats = statsClient.getStats(start, end, uris, true);
-
-            if (stats == null || stats.isEmpty()) {
-                return Collections.emptyMap();
-            }
-
-            return stats.stream()
-                    .collect(Collectors.toMap(
-                            stat -> {
-                                String uri = stat.getUri();
-                                return Long.parseLong(uri.substring(uri.lastIndexOf('/') + 1));
-                            },
-                            ViewStats::getHits,
-                            (existing, replacement) -> existing
-                    ));
-        } catch (Exception e) {
-            log.error("Error getting views for events: {}", e.getMessage());
-            return Collections.emptyMap();
-        }
+        return stats.stream()
+                .collect(Collectors.toMap(
+                        stat -> Long.parseLong(stat.getUri().substring(stat.getUri().lastIndexOf('/') + 1)),
+                        ViewStats::getHits,
+                        (existing, replacement) -> existing
+                ));
     }
 
     /**
@@ -717,23 +706,28 @@ public class EventServiceImpl implements EventService {
         return spec;
     }
 
-    /**
-     * Получение количества просмотров для одного события
-     */
-    private Long getEventViewsById(Long eventId) {
+    private List<ViewStats> getStats(List<String> uris, Boolean unique) {
         try {
             LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
             LocalDateTime end = LocalDateTime.now();
 
-            List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + eventId), true);
+            ResponseEntity<Object> response = statsClient.getStats(start, end, uris, unique);
 
-            if (stats != null && !stats.isEmpty()) {
-                return stats.get(0).getHits();
+            if (response.getStatusCode().is2xxSuccessful() && response.hasBody()) {
+                return objectMapper.convertValue(response.getBody(), new TypeReference<List<ViewStats>>() {});
             }
-            return 0L;
+            return Collections.emptyList();
         } catch (Exception e) {
-            log.error("Error getting views for event {}: {}", eventId, e.getMessage());
-            return 0L;
+            log.error("Error getting stats: {}", e.getMessage());
+            return Collections.emptyList();
         }
+    }
+
+    /**
+     * Получение количества просмотров для одного события
+     */
+    private Long getEventViewsById(Long eventId) {
+        List<ViewStats> stats = getStats(List.of("/events/" + eventId), true);
+        return stats.isEmpty() ? 0L : stats.get(0).getHits();
     }
 }
