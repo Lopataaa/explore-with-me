@@ -44,10 +44,14 @@ public class StatsClient {
 
             HttpEntity<EndpointHitDto> request = new HttpEntity<>(hitDto, headers);
 
-            restTemplate.postForEntity(serverUrl + "/hit", request, Void.class);
-            log.info("Stats saved: app={}, uri={}, ip={}", app, uri, ip);
+            String url = serverUrl + "/hit";
+            log.info("Saving hit to: {}", url);
+
+            ResponseEntity<Void> response = restTemplate.postForEntity(url, request, Void.class);
+            log.info("Save hit response status: {}", response.getStatusCode());
+
         } catch (Exception e) {
-            log.error("Error saving stats: {}", e.getMessage());
+            log.error("Error saving stats: {}", e.getMessage(), e);
         }
     }
 

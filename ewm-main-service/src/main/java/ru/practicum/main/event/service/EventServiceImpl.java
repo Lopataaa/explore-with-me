@@ -422,18 +422,18 @@ public class EventServiceImpl implements EventService {
             throw new NotFoundException("Event with id=" + id + " was not found");
         }
 
-        try {
-            statsClient.saveHit(
-                    "ewm-main-service",
-                    httpRequest.getRequestURI(),
-                    httpRequest.getRemoteAddr(),
-                    LocalDateTime.now()
-            );
-        } catch (Exception e) {
-            log.error("Failed to save hit: {}", e.getMessage());
-        }
+        statsClient.saveHit(
+                "ewm-main-service",
+                httpRequest.getRequestURI(),
+                httpRequest.getRemoteAddr(),
+                LocalDateTime.now()
+        );
 
-        Long views = getEventViewsById(id);
+        LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
+        LocalDateTime end = LocalDateTime.now();
+        List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + id), true);
+
+        long views = stats.isEmpty() ? 0L : stats.get(0).getHits();
         Long confirmedRequests = requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED);
 
         return eventMapper.toEventFullDto(event, confirmedRequests, views);
