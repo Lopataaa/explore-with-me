@@ -324,6 +324,7 @@ public class EventServiceImpl implements EventService {
 
         log.info("Getting public events with filters");
 
+        /*
         try {
             statsClient.saveHit(
                     "ewm-main-service",
@@ -335,6 +336,8 @@ public class EventServiceImpl implements EventService {
             log.error("Failed to save hit: {}", e.getMessage());
         }
 
+         */
+
         if (rangeStart == null && rangeEnd == null) {
             rangeStart = LocalDateTime.now();
         }
@@ -345,9 +348,29 @@ public class EventServiceImpl implements EventService {
 
         Pageable pageable = PageRequest.of(from / size, size);
 
-        List<Event> events = eventRepository.findEventsByFilters(
-                text, categories, paid, rangeStart, rangeEnd, pageable
-        );
+        List<Event> events;
+        if (rangeStart == null) {
+            rangeStart = LocalDateTime.now().minusYears(1);
+        }
+        if (rangeEnd == null) {
+            rangeEnd = LocalDateTime.now().plusYears(10);
+        }
+
+        LocalDateTime finalRangeStart = rangeStart;
+        LocalDateTime finalRangeEnd = rangeEnd;
+
+        events = eventRepository.findAll().stream()
+                .filter(e -> e.getState() == EventState.PUBLISHED)
+                .filter(e -> finalRangeStart == null || e.getEventDate().isAfter(finalRangeStart))
+                .filter(e -> finalRangeEnd == null || e.getEventDate().isBefore(finalRangeEnd))
+                .filter(e -> categories == null || categories.isEmpty() || categories.contains(e.getCategory().getId()))
+                .filter(e -> paid == null || e.getPaid().equals(paid))
+                .filter(e -> text == null || text.isBlank() ||
+                        e.getAnnotation().toLowerCase().contains(text.toLowerCase()) ||
+                        e.getDescription().toLowerCase().contains(text.toLowerCase()))
+                .skip(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .collect(Collectors.toList());
 
         if (onlyAvailable != null && onlyAvailable) {
             events = events.stream()
@@ -645,7 +668,7 @@ public class EventServiceImpl implements EventService {
             LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
             LocalDateTime end = LocalDateTime.now();
 
-            List<ViewStats> stats = statsClient.getStats(start, end, uris, false);
+            List<ViewStats> stats = statsClient.getStats(start, end, uris, true);
 
             if (stats == null || stats.isEmpty()) {
                 return Collections.emptyMap();
@@ -666,22 +689,22 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    private Long getEventViews(Long eventId) {
-        try {
-            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-            LocalDateTime end = LocalDateTime.now();
-
-            List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + eventId), false);
-
-            if (stats != null && !stats.isEmpty()) {
-                return stats.getFirst().getHits();
-            }
-            return 0L;
-        } catch (Exception e) {
-            log.error("Error getting views for event {}: {}", eventId, e.getMessage());
-            return 0L;
-        }
-    }
+//    private Long getEventViews(Long eventId) {
+//        try {
+//            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
+//            LocalDateTime end = LocalDateTime.now();
+//
+//            List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + eventId), false);
+//
+//            if (stats != null && !stats.isEmpty()) {
+//                return stats.getFirst().getHits();
+//            }
+//            return 0L;
+//        } catch (Exception e) {
+//            log.error("Error getting views for event {}: {}", eventId, e.getMessage());
+//            return 0L;
+//        }
+//    }
 
     /**
      * Построение спецификации для фильтрации событий

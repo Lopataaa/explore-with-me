@@ -14,6 +14,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -75,13 +77,12 @@ public class StatsClient {
             );
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return List.of(response.getBody());
+                return Arrays.asList(response.getBody());
             }
-            return List.of();
-
+            return Collections.emptyList();
         } catch (Exception e) {
             log.error("Error getting stats: {}", e.getMessage());
-            return List.of();
+            return Collections.emptyList();
         }
     }
 
