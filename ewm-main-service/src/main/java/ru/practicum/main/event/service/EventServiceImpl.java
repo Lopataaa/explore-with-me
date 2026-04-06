@@ -1,5 +1,6 @@
 package ru.practicum.main.event.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.ValidationException;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.main.category.model.Category;
@@ -422,7 +424,7 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
-        if (event.getState() != EventState.PUBLISHED) {
+        if (!event.getState().equals(EventState.PUBLISHED)) {
             throw new NotFoundException("Event with id=" + id + " was not found");
         }
 
@@ -437,19 +439,32 @@ public class EventServiceImpl implements EventService {
             log.error("Failed to save hit: {}", e.getMessage());
         }
 
-        Long currentViews = event.getViews();
-        if (currentViews == null) {
-            currentViews = 0L;
+        List<ViewStats> stats = getStatsFromStatsClient(List.of("/events/" + id), true);
+
+        long views = stats.isEmpty() ? 0L : stats.get(0).getHits();
+
+        EventFullDto dto = eventMapper.toEventFullDto(event,
+                requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED),
+                views);
+
+        return dto;
+    }
+
+    private List<ViewStats> getStatsFromStatsClient(List<String> uris, boolean unique) {
+        try {
+            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
+            LocalDateTime end = LocalDateTime.now();
+
+            ResponseEntity<Object> response = statsClient.getStatsAsObject(start, end, uris, unique);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.hasBody()) {
+                return objectMapper.convertValue(response.getBody(), new TypeReference<List<ViewStats>>() {});
+            }
+            return Collections.emptyList();
+        } catch (Exception e) {
+            log.error("Error getting stats: {}", e.getMessage());
+            return Collections.emptyList();
         }
-        event.setViews(currentViews + 1);
-        eventRepository.save(event);
-
-        Long views = event.getViews();
-        Long confirmedRequests = requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED);
-
-        log.info("Views for event {}: {}", id, views);
-
-        return eventMapper.toEventFullDto(event, confirmedRequests, views);
     }
 
     /**

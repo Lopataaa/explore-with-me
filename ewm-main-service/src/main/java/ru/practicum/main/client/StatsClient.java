@@ -94,4 +94,31 @@ public class StatsClient {
         }
         return stats.get(0).getHits();
     }
+
+    public ResponseEntity<Object> getStatsAsObject(LocalDateTime start, LocalDateTime end,
+                                                   List<String> uris, Boolean unique) {
+        try {
+            String encodedStart = URLEncoder.encode(start.format(FORMATTER), StandardCharsets.UTF_8);
+            String encodedEnd = URLEncoder.encode(end.format(FORMATTER), StandardCharsets.UTF_8);
+
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(serverUrl + "/stats")
+                    .queryParam("start", encodedStart)
+                    .queryParam("end", encodedEnd)
+                    .queryParam("unique", unique);
+
+            if (uris != null && !uris.isEmpty()) {
+                builder.queryParam("uris", String.join(",", uris));
+            }
+
+            return restTemplate.exchange(
+                    builder.toUriString(),
+                    HttpMethod.GET,
+                    null,
+                    Object.class
+            );
+        } catch (Exception e) {
+            log.error("Error getting stats: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }
