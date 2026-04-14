@@ -75,15 +75,14 @@ public class RequestServiceImpl implements RequestService {
         }
 
         long confirmedRequests = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
-        if (event.getParticipantLimit() > 0 && confirmedRequests >= event.getParticipantLimit()) {
-            throw new ConflictException("The participant limit has been reached");
-        }
-
         RequestStatus status;
-        if (event.getParticipantLimit() == 0) {
+
+        if (event.getParticipantLimit() > 0 && confirmedRequests < event.getParticipantLimit()) {
+            status = RequestStatus.PENDING;
+        } else if (event.getParticipantLimit() == 0) {
             status = RequestStatus.CONFIRMED;
         } else {
-            status = event.getRequestModeration() ? RequestStatus.PENDING : RequestStatus.CONFIRMED;
+            throw new ConflictException("The participant limit has been reached");
         }
 
         Request request = Request.builder()
@@ -98,6 +97,7 @@ public class RequestServiceImpl implements RequestService {
 
         return requestMapper.toParticipationRequestDto(request);
     }
+
 
     /**
      * Отмена запроса на участие в событии

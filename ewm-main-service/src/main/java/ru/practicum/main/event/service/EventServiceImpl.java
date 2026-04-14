@@ -419,17 +419,17 @@ public class EventServiceImpl implements EventService {
     @Override
     @Transactional
     public EventFullDto getPublicEventById(Long id, HttpServletRequest httpRequest) {
-        log.info("Getting public event by id: {}", id);
+        log.info("Fetching public event by id: {}", id);
 
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
         if (event.getState() != EventState.PUBLISHED) {
-            throw new NotFoundException("Event with id=" + id + " was not found");
+            throw new NotFoundException("Event with id=" + id + " is not published");
         }
 
-        int currentViews = viewsCounter.getOrDefault(id, 0);
-        viewsCounter.put(id, currentViews + 1);
+        event.setViews(event.getViews() + 1);
+        eventRepository.save(event);
 
         try {
             statsClient.saveHit(
@@ -442,13 +442,11 @@ public class EventServiceImpl implements EventService {
             log.error("Failed to save hit: {}", e.getMessage());
         }
 
-        Long views = (long) viewsCounter.getOrDefault(id, 0);
-        Long confirmedRequests = requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED);
+        Long confirmedRequests = getConfirmedRequests(id);
 
-        log.info("Views for event {}: {}", id, views);
-
-        return eventMapper.toEventFullDto(event, confirmedRequests, views);
+        return eventMapper.toEventFullDto(event, confirmedRequests, event.getViews());
     }
+
 
     /**
      * Получение событий для администратора с фильтрацией
