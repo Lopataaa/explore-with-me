@@ -77,12 +77,13 @@ public class RequestServiceImpl implements RequestService {
         long confirmedRequests = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
         RequestStatus status;
 
-        if (event.getParticipantLimit() > 0 && confirmedRequests < event.getParticipantLimit()) {
+        if (event.getParticipantLimit() != null && event.getParticipantLimit() > 0) {
+            if (confirmedRequests >= event.getParticipantLimit()) {
+                throw new ConflictException("The participant limit has been reached");
+            }
             status = RequestStatus.PENDING;
-        } else if (event.getParticipantLimit() == 0) {
-            status = RequestStatus.CONFIRMED;
         } else {
-            throw new ConflictException("The participant limit has been reached");
+            status = RequestStatus.CONFIRMED;
         }
 
         Request request = Request.builder()
@@ -97,6 +98,7 @@ public class RequestServiceImpl implements RequestService {
 
         return requestMapper.toParticipationRequestDto(request);
     }
+
 
 
     /**
@@ -213,7 +215,7 @@ public class RequestServiceImpl implements RequestService {
         List<Request> rejected = new ArrayList<>();
 
         if (request.getStatus() == EventRequestStatusUpdateRequest.RequestStatusUpdate.CONFIRMED) {
-            long currentConfirmed = event.getConfirmedRequests();
+            long currentConfirmed = event.getConfirmedRequests() != null ? event.getConfirmedRequests() : 0L;
             int limit = event.getParticipantLimit();
 
             for (Request req : requests) {
@@ -249,6 +251,8 @@ public class RequestServiceImpl implements RequestService {
         requestRepository.saveAll(confirmed);
         requestRepository.saveAll(rejected);
 
+        log.info("Confirmed requests: {}, Rejected requests: {}", confirmed.size(), rejected.size());
+
         return EventRequestStatusUpdateResult.builder()
                 .confirmedRequests(confirmed.stream()
                         .map(requestMapper::toParticipationRequestDto)
@@ -268,8 +272,9 @@ public class RequestServiceImpl implements RequestService {
     @Override
     public Long getConfirmedRequests(Long eventId) {
         log.info("Getting confirmed requests count for event: {}", eventId);
-        return 0L;
+        return requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
     }
+
 
     /**
      * Получение всех запросов для списка событий
