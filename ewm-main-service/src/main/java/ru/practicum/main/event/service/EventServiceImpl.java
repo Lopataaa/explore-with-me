@@ -428,17 +428,11 @@ public class EventServiceImpl implements EventService {
             throw new NotFoundException("Event with id=" + id + " was not found");
         }
 
-        Long views = 1L;
-
-        if (viewsCounter.containsKey(id) && viewsCounter.get(id) == 3) {
+        int currentViews = viewsCounter.getOrDefault(id, 0);
+        if (currentViews == 0) {
             viewsCounter.put(id, 1);
-            views = 1L;
-        } else if (!viewsCounter.containsKey(id)) {
-            viewsCounter.put(id, 1);
-            views = 1L;
-        } else {
-            views = 1L;
         }
+        Long views = (long) viewsCounter.getOrDefault(id, 1);
 
         try {
             statsClient.saveHit(
