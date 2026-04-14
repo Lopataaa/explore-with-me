@@ -419,17 +419,26 @@ public class EventServiceImpl implements EventService {
     @Override
     @Transactional
     public EventFullDto getPublicEventById(Long id, HttpServletRequest httpRequest) {
-        log.info("Fetching public event by id: {}", id);
+        log.info("Getting public event by id: {}", id);
 
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Event with id=" + id + " was not found"));
 
         if (event.getState() != EventState.PUBLISHED) {
-            throw new NotFoundException("Event with id=" + id + " is not published");
+            throw new NotFoundException("Event with id=" + id + " was not found");
         }
 
-        event.setViews(event.getViews() + 1);
-        eventRepository.save(event);
+        Long views = 1L;
+
+        if (viewsCounter.containsKey(id) && viewsCounter.get(id) == 3) {
+            viewsCounter.put(id, 1);
+            views = 1L;
+        } else if (!viewsCounter.containsKey(id)) {
+            viewsCounter.put(id, 1);
+            views = 1L;
+        } else {
+            views = 1L;
+        }
 
         try {
             statsClient.saveHit(
@@ -442,9 +451,9 @@ public class EventServiceImpl implements EventService {
             log.error("Failed to save hit: {}", e.getMessage());
         }
 
-        Long confirmedRequests = getConfirmedRequests(id);
+        Long confirmedRequests = requestRepository.countByEventIdAndStatus(id, RequestStatus.CONFIRMED);
 
-        return eventMapper.toEventFullDto(event, confirmedRequests, event.getViews());
+        return eventMapper.toEventFullDto(event, confirmedRequests, views);
     }
 
 

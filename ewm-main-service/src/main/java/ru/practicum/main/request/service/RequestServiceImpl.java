@@ -75,16 +75,12 @@ public class RequestServiceImpl implements RequestService {
         }
 
         long confirmedRequests = requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
-        RequestStatus status;
-
-        if (event.getParticipantLimit() != null && event.getParticipantLimit() > 0) {
-            if (confirmedRequests >= event.getParticipantLimit()) {
-                throw new ConflictException("The participant limit has been reached");
-            }
-            status = RequestStatus.PENDING;
-        } else {
-            status = RequestStatus.CONFIRMED;
+        if (event.getParticipantLimit() != null && event.getParticipantLimit() > 0
+                && confirmedRequests >= event.getParticipantLimit()) {
+            throw new ConflictException("The participant limit has been reached");
         }
+
+        RequestStatus status = RequestStatus.PENDING;
 
         Request request = Request.builder()
                 .event(event)
@@ -94,7 +90,7 @@ public class RequestServiceImpl implements RequestService {
                 .build();
 
         request = requestRepository.save(request);
-        log.info("Request created with id: {}", request.getId());
+        log.info("Request created with id: {}, status: {}", request.getId(), request.getStatus());
 
         return requestMapper.toParticipationRequestDto(request);
     }
