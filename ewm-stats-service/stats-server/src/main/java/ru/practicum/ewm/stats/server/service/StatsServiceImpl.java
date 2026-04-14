@@ -43,8 +43,12 @@ public class StatsServiceImpl implements StatsService {
         log.info("Получение статистики за период с {} по {}, uris={}, unique={}",
                 start, end, uris, unique);
 
+        if (start == null || end == null) {
+            throw new IllegalArgumentException("Start and end dates cannot be null");
+        }
+
         if (start.isAfter(end)) {
-            throw new IllegalArgumentException("Дата начала не может быть позже даты окончания");
+            throw new IllegalArgumentException("Start date must be before end date");
         }
 
         List<ViewStatsProjection> projections;
@@ -54,12 +58,9 @@ public class StatsServiceImpl implements StatsService {
             projections = statsRepository.getStats(start, end, uris);
         }
 
-        List<ViewStats> result = projections.stream()
+        return projections.stream()
                 .map(this::mapToViewStats)
                 .collect(Collectors.toList());
-
-        log.debug("Найдено {} записей статистики", result.size());
-        return result;
     }
 
     private ViewStats mapToViewStats(ViewStatsProjection projection) {
