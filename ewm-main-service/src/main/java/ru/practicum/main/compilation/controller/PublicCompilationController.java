@@ -21,6 +21,9 @@ public class PublicCompilationController {
 
     private final CompilationService compilationService;
 
+    /**
+     * Получение списка подборок событий с фильтрацией по закрепленным
+     */
     @GetMapping
     public List<CompilationDto> getCompilations(
             @RequestParam(required = false) Boolean pinned,
@@ -30,6 +33,9 @@ public class PublicCompilationController {
         return compilationService.getCompilations(pinned, from, size);
     }
 
+    /**
+     * Получение подборки событий по идентификатору
+     */
     @GetMapping("/{compId}")
     public CompilationDto getCompilationById(@PathVariable Long compId) {
         log.info("GET /compilations/{} - Getting compilation by id", compId);

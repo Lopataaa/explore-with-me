@@ -21,6 +21,9 @@ public class PublicCategoryController {
 
     private final CategoryService categoryService;
 
+    /**
+     * Получение списка категорий с пагинацией
+     */
     @GetMapping("/categories")
     public List<CategoryDto> getCategories(
             @RequestParam(defaultValue = "0") @PositiveOrZero Integer from,
@@ -29,6 +32,9 @@ public class PublicCategoryController {
         return categoryService.getCategories(from, size);
     }
 
+    /**
+     * Получение категории по идентификатору
+     */
     @GetMapping("/categories/{catId}")
     public CategoryDto getCategoryById(@PathVariable Long catId) {
         log.info("GET /categories/{} - Getting category", catId);

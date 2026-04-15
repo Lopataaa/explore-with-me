@@ -3,6 +3,7 @@ package ru.practicum.main.user.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.main.user.dto.NewUserRequest;
@@ -24,26 +25,36 @@ public class AdminUserController {
 
     private final UserService userService;
 
+    /**
+     * Регистрация нового пользователя
+     */
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public UserDto registerUser(@Valid @RequestBody NewUserRequest request) {
+    public ResponseEntity<UserDto> registerUser(@Valid @RequestBody NewUserRequest request) {
         log.info("POST /admin/users - Registering user: {}", request);
-        return userService.registerUser(request);
+        UserDto created = userService.registerUser(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    /**
+     * Получение списка пользователей с пагинацией
+     */
     @GetMapping
-    public List<UserDto> getUsers(
+    public ResponseEntity<List<UserDto>> getUsers(
             @RequestParam(required = false) List<Long> ids,
             @RequestParam(defaultValue = "0") @PositiveOrZero Integer from,
             @RequestParam(defaultValue = "10") @Positive Integer size) {
         log.info("GET /admin/users - Getting users with ids: {}, from: {}, size: {}", ids, from, size);
-        return userService.getUsers(ids, from, size);
+        List<UserDto> users = userService.getUsers(ids, from, size);
+        return ResponseEntity.ok(users);
     }
 
+    /**
+     * Удаление пользователя
+     */
     @DeleteMapping("/{userId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteUser(@PathVariable Long userId) {
+    public ResponseEntity<Void> deleteUser(@PathVariable Long userId) {
         log.info("DELETE /admin/users/{} - Deleting user", userId);
         userService.deleteUser(userId);
+        return ResponseEntity.noContent().build();
     }
 }

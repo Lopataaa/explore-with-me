@@ -24,9 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Реализация сервиса для работы с запросами на участие в событиях
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -38,29 +35,28 @@ public class RequestServiceImpl implements RequestService {
     private final EventRepository eventRepository;
     private final RequestMapper requestMapper;
 
-    /**
-     * Добавление запроса на участие в событии
-     *
-     * @param userId  идентификатор пользователя
-     * @param eventId идентификатор события
-     * @return DTO созданного запроса на участие
-     * @throws NotFoundException если пользователь или событие не найдены
-     * @throws ConflictException если:
-     *                           - инициатор пытается подать заявку на своё событие
-     *                           - событие не опубликовано
-     *                           - запрос уже существует
-     *                           - достигнут лимит участников
-     */
+    private User getUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("User with id=" + userId + " was not found"));
+    }
+
+    private Event getEventOrThrow(Long eventId) {
+        return eventRepository.findById(eventId)
+                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+    }
+
+    private Request getRequestOrThrow(Long requestId) {
+        return requestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("Request with id=" + requestId + " was not found"));
+    }
+
     @Override
     @Transactional
     public ParticipationRequestDto addRequest(Long userId, Long eventId) {
         log.info("Adding request for user: {} to event: {}", userId, eventId);
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("User with id=" + userId + " was not found"));
-
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+        User user = getUserOrThrow(userId);
+        Event event = getEventOrThrow(eventId);
 
         if (event.getInitiator().getId().equals(userId)) {
             throw new ConflictException("Initiator cannot request to own event");
@@ -104,23 +100,12 @@ public class RequestServiceImpl implements RequestService {
         return requestMapper.toParticipationRequestDto(request);
     }
 
-
-
-    /**
-     * Отмена запроса на участие в событии
-     *
-     * @param userId    идентификатор пользователя
-     * @param requestId идентификатор запроса
-     * @return DTO отменённого запроса на участие
-     * @throws NotFoundException если запрос не найден или не принадлежит пользователю
-     */
     @Override
     @Transactional
     public ParticipationRequestDto cancelRequest(Long userId, Long requestId) {
         log.info("Cancelling request: {} for user: {}", requestId, userId);
 
-        Request request = requestRepository.findById(requestId)
-                .orElseThrow(() -> new NotFoundException("Request with id=" + requestId + " was not found"));
+        Request request = getRequestOrThrow(requestId);
 
         if (!request.getRequester().getId().equals(userId)) {
             throw new NotFoundException("Request with id=" + requestId + " was not found");
@@ -132,20 +117,11 @@ public class RequestServiceImpl implements RequestService {
         return requestMapper.toParticipationRequestDto(request);
     }
 
-    /**
-     * Получение всех запросов пользователя на участие в чужих событиях
-     *
-     * @param userId идентификатор пользователя
-     * @return список DTO запросов на участие
-     * @throws NotFoundException если пользователь не найден
-     */
     @Override
     public List<ParticipationRequestDto> getUserRequests(Long userId) {
         log.info("Getting requests for user: {}", userId);
 
-        if (!userRepository.existsById(userId)) {
-            throw new NotFoundException("User with id=" + userId + " was not found");
-        }
+        getUserOrThrow(userId);
 
         return requestRepository.findByRequesterId(userId)
                 .stream()
@@ -153,20 +129,11 @@ public class RequestServiceImpl implements RequestService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Получение всех запросов на участие в событии текущего пользователя
-     *
-     * @param userId  идентификатор пользователя
-     * @param eventId идентификатор события
-     * @return список DTO запросов на участие
-     * @throws NotFoundException если событие не найдено или пользователь не является инициатором
-     */
     @Override
     public List<ParticipationRequestDto> getEventRequests(Long userId, Long eventId) {
         log.info("Getting requests for event: {} by user: {}", eventId, userId);
 
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+        Event event = getEventOrThrow(eventId);
 
         if (!event.getInitiator().getId().equals(userId)) {
             throw new NotFoundException("Event with id=" + eventId + " was not found");
@@ -178,31 +145,13 @@ public class RequestServiceImpl implements RequestService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Изменение статуса запросов на участие в событии (подтверждение/отклонение)
-     * <p>
-     * При подтверждении заявок:
-     * <ul>
-     *   <li>Если достигнут лимит участников, оставшиеся заявки автоматически отклоняются</li>
-     *   <li>Если лимит не установлен (0), все заявки подтверждаются</li>
-     * </ul>
-     * При отклонении все выбранные заявки получают статус REJECTED
-     *
-     * @param userId  идентификатор пользователя
-     * @param eventId идентификатор события
-     * @param request DTO с идентификаторами запросов и новым статусом
-     * @return результат обработки заявок (подтверждённые и отклонённые)
-     * @throws NotFoundException если событие не найдено или пользователь не является инициатором
-     * @throws ConflictException если статус заявки не PENDING
-     */
     @Override
     @Transactional
     public EventRequestStatusUpdateResult changeRequestStatus(Long userId, Long eventId,
                                                               EventRequestStatusUpdateRequest request) {
         log.info("Changing request status for event: {} with request: {}", eventId, request);
 
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new NotFoundException("Event with id=" + eventId + " was not found"));
+        Event event = getEventOrThrow(eventId);
 
         if (!event.getInitiator().getId().equals(userId)) {
             throw new NotFoundException("Event with id=" + eventId + " was not found");
@@ -268,25 +217,12 @@ public class RequestServiceImpl implements RequestService {
                 .build();
     }
 
-    /**
-     * Получение количества подтверждённых запросов на участие в событии
-     *
-     * @param eventId идентификатор события
-     * @return количество подтверждённых запросов
-     */
     @Override
     public Long getConfirmedRequests(Long eventId) {
         log.info("Getting confirmed requests count for event: {}", eventId);
         return requestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
     }
 
-
-    /**
-     * Получение всех запросов для списка событий
-     *
-     * @param eventIds список идентификаторов событий
-     * @return список DTO запросов на участие
-     */
     @Override
     public List<ParticipationRequestDto> getRequestsByEventIds(List<Long> eventIds) {
         log.info("Getting requests for event ids: {}", eventIds);

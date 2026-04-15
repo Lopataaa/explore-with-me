@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Контроллер сервиса статистики
+ */
 @RestController
 @RequiredArgsConstructor
 @Slf4j
@@ -21,13 +24,19 @@ public class StatsController {
 
     private final StatsService statsService;
 
+    /**
+     * Сохранение информации о том, что к эндпоинту был запрос
+     */
     @PostMapping("/hit")
-    @ResponseStatus(HttpStatus.CREATED)
-    public void hit(@Valid @RequestBody EndpointHit endpointHit) {
+    public ResponseEntity<Void> hit(@Valid @RequestBody EndpointHit endpointHit) {
         log.info("Получен POST запрос на /hit: {}", endpointHit);
         statsService.saveHit(endpointHit);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
+    /**
+     * Получение статистики по посещениям
+     */
     @GetMapping("/stats")
     public ResponseEntity<List<ViewStats>> getStats(
             @RequestParam @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime start,

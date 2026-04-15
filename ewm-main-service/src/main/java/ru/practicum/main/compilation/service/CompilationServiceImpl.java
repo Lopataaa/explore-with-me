@@ -20,9 +20,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Реализация сервиса для работы с подборками событий
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -33,12 +30,11 @@ public class CompilationServiceImpl implements CompilationService {
     private final EventRepository eventRepository;
     private final CompilationMapper compilationMapper;
 
-    /**
-     * Создание новой подборки событий
-     *
-     * @param newCompilationDto данные для создания подборки
-     * @return DTO созданной подборки
-     */
+    private Compilation getCompilationOrThrow(Long compId) {
+        return compilationRepository.findById(compId)
+                .orElseThrow(() -> new NotFoundException("Compilation with id=" + compId + " was not found"));
+    }
+
     @Override
     @Transactional
     public CompilationDto createCompilation(NewCompilationDto newCompilationDto) {
@@ -55,21 +51,12 @@ public class CompilationServiceImpl implements CompilationService {
         return compilationMapper.toCompilationDto(compilation, 0L, 0L);
     }
 
-    /**
-     * Обновление информации о подборке
-     *
-     * @param compId        идентификатор подборки
-     * @param updateRequest данные для обновления
-     * @return DTO обновленной подборки
-     * @throws NotFoundException если подборка не найдена
-     */
     @Override
     @Transactional
     public CompilationDto updateCompilation(Long compId, UpdateCompilationRequest updateRequest) {
         log.info("Updating compilation with id: {}, request: {}", compId, updateRequest);
 
-        Compilation compilation = compilationRepository.findById(compId)
-                .orElseThrow(() -> new NotFoundException("Compilation with id=" + compId + " was not found"));
+        Compilation compilation = getCompilationOrThrow(compId);
 
         if (updateRequest.getEvents() != null) {
             List<Event> events = eventRepository.findAllById(updateRequest.getEvents());
@@ -89,31 +76,15 @@ public class CompilationServiceImpl implements CompilationService {
         return compilationMapper.toCompilationDto(compilation, 0L, 0L);
     }
 
-    /**
-     * Удаление подборки
-     *
-     * @param compId идентификатор подборки
-     * @throws NotFoundException если подборка не найдена
-     */
     @Override
     @Transactional
     public void deleteCompilation(Long compId) {
         log.info("Deleting compilation with id: {}", compId);
 
-        Compilation compilation = compilationRepository.findById(compId)
-                .orElseThrow(() -> new NotFoundException("Compilation with id=" + compId + " was not found"));
-
+        Compilation compilation = getCompilationOrThrow(compId);
         compilationRepository.delete(compilation);
     }
 
-    /**
-     * Получение списка подборок с фильтрацией
-     *
-     * @param pinned флаг закрепления (true/false/null)
-     * @param from   количество элементов для пропуска
-     * @param size   количество элементов на странице
-     * @return список DTO подборок
-     */
     @Override
     public List<CompilationDto> getCompilations(Boolean pinned, Integer from, Integer size) {
         log.info("Getting compilations with pinned: {}, from: {}, size: {}", pinned, from, size);
@@ -132,20 +103,11 @@ public class CompilationServiceImpl implements CompilationService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Получение подборки по идентификатору
-     *
-     * @param compId идентификатор подборки
-     * @return DTO подборки
-     * @throws NotFoundException если подборка не найдена
-     */
     @Override
     public CompilationDto getCompilationById(Long compId) {
         log.info("Getting compilation by id: {}", compId);
 
-        Compilation compilation = compilationRepository.findById(compId)
-                .orElseThrow(() -> new NotFoundException("Compilation with id=" + compId + " was not found"));
-
+        Compilation compilation = getCompilationOrThrow(compId);
         return compilationMapper.toCompilationDto(compilation, 0L, 0L);
     }
 }

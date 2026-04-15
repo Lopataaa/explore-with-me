@@ -3,6 +3,7 @@ package ru.practicum.main.request.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.main.request.dto.ParticipationRequestDto;
@@ -19,26 +20,37 @@ public class PrivateRequestController {
 
     private final RequestService requestService;
 
+    /**
+     * Создание запроса на участие в событии
+     */
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public ParticipationRequestDto addRequest(
+    public ResponseEntity<ParticipationRequestDto> addRequest(
             @PathVariable Long userId,
             @RequestParam Long eventId) {
         log.info("POST /users/{}/requests - Adding request for event: {}", userId, eventId);
-        return requestService.addRequest(userId, eventId);
+        ParticipationRequestDto created = requestService.addRequest(userId, eventId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    /**
+     * Отмена запроса на участие в событии
+     */
     @PatchMapping("/{requestId}/cancel")
-    public ParticipationRequestDto cancelRequest(
+    public ResponseEntity<ParticipationRequestDto> cancelRequest(
             @PathVariable Long userId,
             @PathVariable Long requestId) {
         log.info("PATCH /users/{}/requests/{}/cancel - Cancelling request", userId, requestId);
-        return requestService.cancelRequest(userId, requestId);
+        ParticipationRequestDto cancelled = requestService.cancelRequest(userId, requestId);
+        return ResponseEntity.ok(cancelled);
     }
 
+    /**
+     * Получение списка запросов текущего пользователя
+     */
     @GetMapping
-    public List<ParticipationRequestDto> getUserRequests(@PathVariable Long userId) {
+    public ResponseEntity<List<ParticipationRequestDto>> getUserRequests(@PathVariable Long userId) {
         log.info("GET /users/{}/requests - Getting user requests", userId);
-        return requestService.getUserRequests(userId);
+        List<ParticipationRequestDto> requests = requestService.getUserRequests(userId);
+        return ResponseEntity.ok(requests);
     }
 }

@@ -22,6 +22,9 @@ public class EventRequestController {
 
     private final RequestService requestService;
 
+    /**
+     * Получение списка запросов на участие в событии
+     */
     @GetMapping
     public List<ParticipationRequestDto> getEventRequests(
             @PathVariable Long userId,
@@ -30,6 +33,9 @@ public class EventRequestController {
         return requestService.getEventRequests(userId, eventId);
     }
 
+    /**
+     * Изменение статуса запросов на участие в событии
+     */
     @PatchMapping
     public EventRequestStatusUpdateResult changeRequestStatus(
             @PathVariable Long userId,

@@ -35,9 +35,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-/**
- * Реализация сервиса для управления событиями
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -56,15 +53,6 @@ public class EventServiceImpl implements EventService {
 
     private static final int MIN_HOURS_BEFORE_EVENT = 2;
 
-    /**
-     * Добавление нового события
-     *
-     * @param userId      идентификатор пользователя-инициатора
-     * @param newEventDto данные для создания события
-     * @return DTO с полной информацией о созданном событии
-     * @throws NotFoundException если пользователь или категория не найдены
-     * @throws ConflictException если дата события не соответствует правилам
-     */
     @Override
     @Transactional
     public EventFullDto addEvent(Long userId, NewEventDto newEventDto) {
@@ -124,15 +112,6 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toEventFullDto(event, getConfirmedRequests(event.getId()), event.getViews());
     }
 
-    /**
-     * Получение списка событий пользователя
-     *
-     * @param userId идентификатор пользователя
-     * @param from   количество элементов для пропуска
-     * @param size   количество элементов на странице
-     * @return список DTO с краткой информацией о событиях
-     * @throws NotFoundException если пользователь не найден
-     */
     @Override
     public List<EventShortDto> getUserEvents(Long userId, Integer from, Integer size) {
         log.info("Getting events for user: {}", userId);
@@ -145,14 +124,6 @@ public class EventServiceImpl implements EventService {
         return events.getContent().stream().map(event -> eventMapper.toEventShortDto(event, getConfirmedRequests(event.getId()), event.getViews())).collect(Collectors.toList());
     }
 
-    /**
-     * Получение полной информации о событии пользователя
-     *
-     * @param userId  идентификатор пользователя
-     * @param eventId идентификатор события
-     * @return DTO с полной информацией о событии
-     * @throws NotFoundException если событие не найдено
-     */
     @Override
     public EventFullDto getUserEventById(Long userId, Long eventId) {
         log.info("Getting event {} for user: {}", eventId, userId);
@@ -162,17 +133,6 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toEventFullDto(event, getConfirmedRequests(eventId), event.getViews());
     }
 
-    /**
-     * Обновление события пользователем
-     *
-     * @param userId  идентификатор пользователя
-     * @param eventId идентификатор события
-     * @param request данные для обновления
-     * @return DTO с обновленной информацией о событии
-     * @throws NotFoundException   если событие не найдено
-     * @throws BadRequestException если данные не проходят валидацию
-     * @throws ConflictException   если событие нельзя редактировать
-     */
     @Override
     @Transactional
     public EventFullDto updateUserEvent(Long userId, Long eventId, UpdateEventUserRequest request) {
@@ -304,21 +264,6 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toEventFullDto(event, confirmedRequests, event.getViews());
     }
 
-    /**
-     * Получение публичных событий с фильтрацией
-     *
-     * @param text          текст для поиска
-     * @param categories    список категорий
-     * @param paid          флаг платности
-     * @param rangeStart    начало диапазона дат
-     * @param rangeEnd      конец диапазона дат
-     * @param onlyAvailable только доступные события
-     * @param sort          сортировка
-     * @param from          количество элементов для пропуска
-     * @param size          количество элементов на странице
-     * @param httpRequest   HTTP-запрос для статистики
-     * @return список DTO с краткой информацией о событиях
-     */
     @Override
     @Transactional(readOnly = true)
     public List<EventShortDto> getPublicEvents(String text, List<Long> categories, Boolean paid,
@@ -408,14 +353,6 @@ public class EventServiceImpl implements EventService {
         return result;
     }
 
-    /**
-     * Получение публичного события по идентификатору
-     *
-     * @param id          идентификатор события
-     * @param httpRequest HTTP-запрос для статистики
-     * @return DTO с полной информацией о событии
-     * @throws NotFoundException если событие не найдено или не опубликовано
-     */
     @Override
     @Transactional
     public EventFullDto getPublicEventById(Long id, HttpServletRequest httpRequest) {
@@ -450,19 +387,6 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toEventFullDto(event, confirmedRequests, views);
     }
 
-
-    /**
-     * Получение событий для администратора с фильтрацией
-     *
-     * @param users      список идентификаторов пользователей
-     * @param states     список статусов
-     * @param categories список категорий
-     * @param rangeStart начало диапазона дат
-     * @param rangeEnd   конец диапазона дат
-     * @param from       количество элементов для пропуска
-     * @param size       количество элементов на странице
-     * @return список DTO с полной информацией о событиях
-     */
     @Override
     public List<EventFullDto> getAdminEvents(List<Long> users, List<EventState> states, List<Long> categories, LocalDateTime rangeStart, LocalDateTime rangeEnd, Integer from, Integer size) {
         log.info("Getting admin events - users: {}, states: {}, categories: {}", users, states, categories);
@@ -500,15 +424,6 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    /**
-     * Обновление события администратором
-     *
-     * @param eventId идентификатор события
-     * @param request данные для обновления
-     * @return DTO с обновленной информацией о событии
-     * @throws NotFoundException если событие не найдено
-     * @throws ConflictException если событие нельзя опубликовать или отклонить
-     */
     @Override
     @Transactional
     public EventFullDto updateAdminEvent(Long eventId, UpdateEventAdminRequest request) {
@@ -626,9 +541,6 @@ public class EventServiceImpl implements EventService {
         return eventMapper.toEventFullDto(event, getConfirmedRequests(eventId), event.getViews());
     }
 
-    /**
-     * Получение количества подтвержденных запросов
-     */
     private Long getConfirmedRequests(Long eventId) {
         log.info("=== getConfirmedRequests called for eventId: {} ===", eventId);
         Event event = eventRepository.findById(eventId).orElse(null);
@@ -663,9 +575,6 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    /**
-     * Получение просмотров для списка событий
-     */
     private Map<Long, Long> getViewsForEvents(List<Event> events) {
         if (events == null || events.isEmpty()) {
             return Collections.emptyMap();
@@ -697,9 +606,6 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    /**
-     * Построение спецификации для фильтрации событий
-     */
     private Specification<Event> buildEventSpecification(String text, List<Long> categories, Boolean paid, LocalDateTime rangeStart, LocalDateTime rangeEnd) {
 
         Specification<Event> spec = Specification.where((root, query, cb) -> cb.equal(root.get("state"), EventState.PUBLISHED));
@@ -727,24 +633,4 @@ public class EventServiceImpl implements EventService {
 
         return spec;
     }
-
-//    /**
-//     * Получение количества просмотров для одного события
-//     */
-//    private Long getEventViewsById(Long eventId) {
-//        try {
-//            LocalDateTime start = LocalDateTime.of(2020, 1, 1, 0, 0, 0);
-//            LocalDateTime end = LocalDateTime.now();
-//
-//            List<ViewStats> stats = statsClient.getStats(start, end, List.of("/events/" + eventId), true);
-//
-//            if (stats != null && !stats.isEmpty()) {
-//                return stats.get(0).getHits();
-//            }
-//            return 0L;
-//        } catch (Exception e) {
-//            log.error("Error getting views for event {}: {}", eventId, e.getMessage());
-//            return 0L;
-//        }
-//    }
 }

@@ -3,6 +3,7 @@ package ru.practicum.main.compilation.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.main.compilation.dto.CompilationDto;
@@ -21,25 +22,35 @@ public class AdminCompilationController {
 
     private final CompilationService compilationService;
 
+    /**
+     * Создание новой подборки событий
+     */
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public CompilationDto createCompilation(@Valid @RequestBody NewCompilationDto newCompilationDto) {
+    public ResponseEntity<CompilationDto> createCompilation(@Valid @RequestBody NewCompilationDto newCompilationDto) {
         log.info("POST /admin/compilations - Creating compilation: {}", newCompilationDto);
-        return compilationService.createCompilation(newCompilationDto);
+        CompilationDto created = compilationService.createCompilation(newCompilationDto);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    /**
+     * Обновление подборки событий
+     */
     @PatchMapping("/{compId}")
-    public CompilationDto updateCompilation(
+    public ResponseEntity<CompilationDto> updateCompilation(
             @PathVariable Long compId,
             @Valid @RequestBody UpdateCompilationRequest updateRequest) {
         log.info("PATCH /admin/compilations/{} - Updating compilation: {}", compId, updateRequest);
-        return compilationService.updateCompilation(compId, updateRequest);
+        CompilationDto updated = compilationService.updateCompilation(compId, updateRequest);
+        return ResponseEntity.ok(updated);
     }
 
+    /**
+     * Удаление подборки событий
+     */
     @DeleteMapping("/{compId}")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteCompilation(@PathVariable Long compId) {
+    public ResponseEntity<Void> deleteCompilation(@PathVariable Long compId) {
         log.info("DELETE /admin/compilations/{} - Deleting compilation", compId);
         compilationService.deleteCompilation(compId);
+        return ResponseEntity.noContent().build();
     }
 }

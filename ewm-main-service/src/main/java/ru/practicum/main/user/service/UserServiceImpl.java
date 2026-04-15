@@ -17,9 +17,6 @@ import ru.practicum.main.user.repository.UserRepository;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * Реализация сервиса для работы с пользователями
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -29,13 +26,6 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
 
-    /**
-     * Регистрация нового пользователя
-     *
-     * @param newUserRequest данные для регистрации
-     * @return DTO зарегистрированного пользователя
-     * @throws ConflictException если пользователь с таким email уже существует
-     */
     @Override
     @Transactional
     public UserDto registerUser(NewUserRequest newUserRequest) {
@@ -51,14 +41,6 @@ public class UserServiceImpl implements UserService {
         return userMapper.toUserDto(user);
     }
 
-    /**
-     * Получение списка пользователей
-     *
-     * @param ids  список идентификаторов пользователей (если null - все пользователи)
-     * @param from количество элементов для пропуска
-     * @param size количество элементов на странице
-     * @return список DTO пользователей
-     */
     @Override
     public List<UserDto> getUsers(List<Long> ids, Integer from, Integer size) {
         log.info("Getting users with ids: {}, from: {}, size: {}", ids, from, size);
@@ -75,12 +57,6 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Удаление пользователя
-     *
-     * @param userId идентификатор пользователя
-     * @throws NotFoundException если пользователь не найден
-     */
     @Override
     @Transactional
     public void deleteUser(Long userId) {
