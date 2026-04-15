@@ -1,47 +1,106 @@
-version: '3.8'
 services:
-  stats-server:
-    build: ewm-stats-service/stats-server
-    image: stats-server-image
-    container_name: stats-server-container
-    ports:
-      - "9090:9090"
-    depends_on:
-      - stats-db
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/ewm-stats
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=root
-
   stats-db:
-    image: postgres:16.1
-    container_name: stats-db-container
+    image: postgres:14-alpine
+    container_name: stats-db
     ports:
       - "6541:5432"
     environment:
-      - POSTGRES_DB=ewm-stats
+      - POSTGRES_DB=explorewithme_stats
       - POSTGRES_USER=root
       - POSTGRES_PASSWORD=root
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER"]
+      timeout: 5s
+      interval: 5s
+      retries: 10
 
-#  ewm-service:
-#    build: ewm-main-service
-#    image: ewm-service-image
-#    container_name: ewm-service-container
-#    ports:
-#      - "8080:8080"
-#    depends_on:
-#      - ewm-db
-#    environment:
-#      - SPRING_DATASOURCE_URL=jdbc:postgresql://ewm-db:5432/ewm-main
-#      - SPRING_DATASOURCE_USERNAME=root
-#      - SPRING_DATASOURCE_PASSWORD=root
-#
-#  ewm-db:
-#    image: postgres:16.1
-#    container_name: ewm-db-container
-#    ports:
-#      - "6542:5432"
-#    environment:
-#      - POSTGRES_DB=ewm-main
-#      - POSTGRES_USER=root
-#      - POSTGRES_PASSWORD=root
+  stats-server:
+    build: ./ewm-stats-service/stats-server
+    container_name: stats-server
+    ports:
+      - "9090:9090"
+    depends_on:
+      stats-db:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/explorewithme_stats
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+
+  main-db:
+    image: postgres:14-alpine
+    container_name: main-db
+    ports:
+      - "6542:5432"
+    environment:
+      - POSTGRES_DB=explorewithme_main
+      - POSTGRES_USER=root
+      - POSTGRES_PASSWORD=root
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER"]
+      timeout: 5s
+      interval: 5s
+      retries: 10
+
+  ewm-service:
+    build: ./ewm-main-service
+    container_name: ewm-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      main-db:
+        condition: service_healthy
+      stats-server:
+        condition: service_started
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://main-db:5432/explorewithme_main
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - STATS_SERVER_URL=http://stats-server:9090
+
+  # Сервис для вставки тестовых данных
+  test-data:
+    image: postgres:14-alpine
+    depends_on:
+      main-db:
+        condition: service_healthy
+    entrypoint: >
+      sh -c "
+        echo 'Waiting for main-db...';
+        sleep 5;
+        echo 'Inserting test data...';
+        PGPASSWORD=root psql -h main-db -U root -d explorewithme_main << 'EOF'
+        -- Очищаем таблицы
+        TRUNCATE events, compilations, compilation_events, requests, users, categories RESTART IDENTITY CASCADE;
+      
+        -- Вставляем категорию
+        INSERT INTO categories (name) VALUES ('Концерты');
+      
+        -- Вставляем пользователя
+        INSERT INTO users (name, email) VALUES ('Test User', 'test@example.com');
+      
+        -- Вставляем опубликованное событие с правильной аннотацией
+        INSERT INTO events (
+            annotation, category_id, created_on, description, event_date, 
+            initiator_id, lat, lon, paid, participant_limit, published_on, 
+            request_moderation, state, title, views
+        ) VALUES (
+            'Тестовое событие для проверки API',
+            (SELECT id FROM categories WHERE name = 'Концерты'),
+            NOW(),
+            'Полное описание тестового события',
+            NOW() + INTERVAL '30 days',
+            (SELECT id FROM users WHERE email = 'test@example.com'),
+            55.754167,
+            37.62,
+            false,
+            10,
+            NOW(),
+            true,
+            'PUBLISHED',
+            'Тестовое событие',
+            0
+        );
+        EOF
+        echo 'Test data inserted successfully!';
+      "
