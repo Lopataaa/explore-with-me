@@ -3,6 +3,7 @@ package ru.practicum.main.event.model;
 import lombok.*;
 import ru.practicum.main.category.model.Category;
 import ru.practicum.main.location.model.Location;
+import ru.practicum.main.location.model.LocationEntity;
 import ru.practicum.main.user.model.User;
 
 import jakarta.persistence.*;
@@ -67,4 +68,8 @@ public class Event {
 
     @Column(name = "confirmed_requests", nullable = false)
     private Long confirmedRequests = 0L;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "location_entity_id")
+    private LocationEntity locationEntity;
 }
